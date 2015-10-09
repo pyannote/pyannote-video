@@ -1,0 +1,2 @@
+include versioneer.py
+include pyannote/video/_version.py
