@@ -41,9 +41,12 @@ setup(
     },
     include_package_data=True,
     scripts=[
+        "scripts/pyannote-shot.py",
     ],
     install_requires=[
         'numpy >= 1.8',
+        'docopt >= 0.6.2',
+        'tqdm >= 2.0.0',
     ],
 
     version=versioneer.get_version(),
