@@ -103,7 +103,7 @@ class Video:
 
         self.infos = infos
 
-        self.pix_fmt = 'rbg24'
+        self.pix_fmt = 'rgb24'
         self.depth = 3
 
         w, h = self.size
