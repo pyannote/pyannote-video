@@ -37,6 +37,8 @@ import re
 import warnings
 import logging
 import numpy as np
+from collections import deque
+
 
 logging.captureWarnings(True)
 
@@ -333,7 +335,31 @@ class Video:
 
         return result
 
-    def iterframes(self, start=None, end=None, step=None, with_time=False):
+    def __iter__(self):
+        return self.iterframes()
+
+    def iterframes(self, start=None, end=None, step=None, with_time=False,
+                   with_context=False, context=1):
+        """Iterate over video frames
+
+        Parameters
+        ----------
+        start : float
+            Begin iterating frames at time `start` (in seconds).
+            Defaults to 0.
+        end : float
+            Stop iterating frames at time `end` (in seconds).
+            Defaults to video duration.
+        step : float
+            Iterate frames every `step` seconds.
+            Defaults to iterating every frame.
+        with_time : boolean
+            When True, yields (time, frame).
+        with_context : {False, 'left', 'right', 'center'}
+            Defaults to False.
+        context : int
+            Number of contextual frames. Defaults to 1.
+        """
 
         # default: starts from the beginning
         if start is None:
@@ -350,13 +376,38 @@ class Video:
         # TODO warning if step != N x 1/fps (where N is an integer)
         # warnings.warn(message, UserWarning)
 
+        # initialize buffer of contextual frames
+        if with_context:
+            frames = deque([], context)
+            timestamps = deque([], context)
+
         for t in np.arange(start, end, step):
+
             frame = self._get_frame(t)
 
+            # fill buffer of contextual frames
+            if with_context:
+                frames.append(frame)
+                timestamps.append(t)
+                if len(frames) < context:
+                    continue
+
+
+            f_ = frames if with_context else frame
+
             if with_time:
-                yield t, frame
+
+                if with_context is 'right':
+                    t_ = timestamps[0]
+                elif with_context is 'center':
+                    t_ = timestamps[context / 2]
+                else:
+                    t_ = t
+
+                yield t_, f_
+
             else:
-                yield frame
+                yield f_
 
     def __call__(self, t):
         return self._get_frame(t)
