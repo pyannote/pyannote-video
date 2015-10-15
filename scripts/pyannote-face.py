@@ -87,7 +87,7 @@ def detect(video, output, step=None, shape=None, show_progress=False):
 
                 f.write('{t:.3f} {left:d} {top:d} {right:d} {bottom:d}'.format(
                     t=t, left=boundingBox.left(), right=boundingBox.right(),
-                    top=boundingBox.top(), bottom=boundingBox.top()))
+                    top=boundingBox.top(), bottom=boundingBox.bottom()))
 
                 if facialFeaturesDetector:
 
