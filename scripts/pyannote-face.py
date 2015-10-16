@@ -142,7 +142,7 @@ if __name__ == '__main__':
         if smallest > SMALLEST_DEFAULT:
             upscale = 1
         else:
-            upscale = np.ceil(SMALLEST_DEFAULT / smallest)
+            upscale = int(np.ceil(SMALLEST_DEFAULT / smallest))
 
         detection = arguments['<detection>']
 
