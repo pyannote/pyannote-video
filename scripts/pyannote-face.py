@@ -29,14 +29,15 @@
 """Face detection and tracking
 
 Usage:
-  pyannote-face detect [options] <video> <output>
   pyannote-face track [options] <video> <shot> <face> <track>
+  pyannote-face detect [options] <video> <detection>
   pyannote-face (-h | --help)
   pyannote-face --version
 
 Options:
   --every=<msec>       Process one frame every <msec> milliseconds.
   --shape=<model>      Perform facial features detection using <model>.
+  --smallest=<size>    (approximate) size of smallest face [default: 40].
   -h --help            Show this screen.
   --version            Show version.
   --verbose            Show progress.
@@ -47,12 +48,19 @@ from pyannote.video import __version__
 from pyannote.video import Video
 
 from tqdm import tqdm
+import numpy as np
 import cv2
 
 import dlib
 
+SMALLEST_DEFAULT = 40
 
-def detect(video, output, step=None, shape=None, show_progress=False):
+
+def detect(video, output,
+           step=None, shape=None,
+           upscale=1,
+           show_progress=False):
+    """Face detection"""
 
     # frame iterator
     generator = video.iterframes(step=step, with_time=True)
@@ -83,7 +91,7 @@ def detect(video, output, step=None, shape=None, show_progress=False):
 
             gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
 
-            for boundingBox in faceDetector(gray, 1):
+            for boundingBox in faceDetector(gray, upscale):
 
                 f.write('{t:.3f} {left:d} {top:d} {right:d} {bottom:d}'.format(
                     t=t, left=boundingBox.left(), right=boundingBox.right(),
@@ -114,23 +122,33 @@ if __name__ == '__main__':
     filename = arguments['<video>']
     video = Video(filename)
 
-    output = arguments['<output>']
     verbose = arguments['--verbose']
 
-    every = arguments['--every']
-    if not every:
-        step = None
-    else:
-        step = 1e-3 * float(arguments['--every'])
-
-    # facial features detection
-    shape = arguments['--shape']
-    if not shape:
-        shape = None
-
     if arguments['detect']:
-        detect(video, output,
+
+        every = arguments['--every']
+        if not every:
+            step = None
+        else:
+            step = 1e-3 * float(arguments['--every'])
+
+        # facial features detection
+        shape = arguments['--shape']
+        if not shape:
+            shape = None
+
+        # (approximate) size of smallest face
+        smallest = float(arguments['--smallest'])
+        if smallest > SMALLEST_DEFAULT:
+            upscale = 1
+        else:
+            upscale = np.ceil(SMALLEST_DEFAULT / smallest)
+
+        detection = arguments['<detection>']
+
+        detect(video, detection,
                step=step, shape=shape,
+               upscale=upscale,
                show_progress=verbose)
 
     if arguments['track']:
