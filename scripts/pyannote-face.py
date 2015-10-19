@@ -37,7 +37,7 @@ Usage:
 Options:
   --every=<msec>       Process one frame every <msec> milliseconds.
   --shape=<model>      Perform facial features detection using <model>.
-  --smallest=<size>    (approximate) size of smallest face [default: 40].
+  --smallest=<size>    (approximate) size of smallest face [default: 36].
   -h --help            Show this screen.
   --version            Show version.
   --verbose            Show progress.
@@ -53,7 +53,7 @@ import cv2
 
 import dlib
 
-SMALLEST_DEFAULT = 40
+SMALLEST_DEFAULT = 36
 
 
 def detect(video, output,
