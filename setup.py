@@ -49,6 +49,7 @@ setup(
         'docopt >= 0.6.2',
         'tqdm >= 2.0.0',
         'dlib >= 18.17.100',
+        'munkres >= 1.0.7',
     ],
 
     version=versioneer.get_version(),
