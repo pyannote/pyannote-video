@@ -329,7 +329,7 @@ def shape(video, model, tracking, output, show_progress=False):
                 points = facialFeaturesDetector(gray, boundingBox)
                 facialFeatures = [(p.x, p.y) for p in points.parts()]
 
-                foutput.write('{t:3f} {identifier:d}'.format(
+                foutput.write('{t:.3f} {identifier:d}'.format(
                     t=T, identifier=identifier))
                 for x, y in facialFeatures:
                     foutput.write(' {x:d} {y:d}'.format(x=x, y=y))
