@@ -239,7 +239,7 @@ def detect(video, output, step=None, upscale=1, show_progress=False):
             for boundingBox in faceDetector(gray, upscale):
 
                 foutput.write(FACE_TEMPLATE.format(
-                    t=t, identifier=identifier, confidence=-1,
+                    t=t, identifier=identifier, confidence=0.000,
                     left=boundingBox.left(), right=boundingBox.right(),
                     top=boundingBox.top(), bottom=boundingBox.bottom()))
 
