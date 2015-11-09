@@ -421,7 +421,8 @@ if __name__ == '__main__':
     arguments = docopt(__doc__, version=version)
 
     # initialize video
-    video = Video(arguments['<video>'])
+    filename = arguments['<video>']
+    video = Video(filename)
 
     verbose = arguments['--verbose']
 
