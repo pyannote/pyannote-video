@@ -361,7 +361,8 @@ def track(video, shot, detection, output,
                 trackers[identifier] = tracker
 
                 foutput.write(FACE_TEMPLATE.format(
-                    t=T, identifier=identifier, confidence=0.000,
+                    t=T, identifier=identifier,
+                    confidence=confidences[identifier],
                     left=int(face.left()), right=int(face.right()),
                     top=int(face.top()), bottom=int(face.bottom())))
 
