@@ -101,11 +101,12 @@ def getFaceGenerator(detection):
             T = float(tokens[0])
             identifier = int(tokens[1])
             face = dlib.drectangle(*[int(token) for token in tokens[2:6]])
+            confidence = float(tokens[6])
 
             # load all faces from current frame
             # and only those faces
             if T == currentT or currentT is None:
-                faces.append((identifier, face))
+                faces.append((identifier, face, confidence))
                 currentT = T
                 continue
 
@@ -124,7 +125,7 @@ def getFaceGenerator(detection):
                 t = yield currentT, faces
 
                 # reset current time and corresponding faces
-                faces = [(identifier, face)]
+                faces = [(identifier, face, confidence)]
                 currentT = T
                 break
 
@@ -229,7 +230,7 @@ def track(video, shot, detection, output, show_progress=False):
                 trackers_ = trackers.items()
                 for t, (i, tracker) in enumerate(trackers_):
                     position = tracker.get_position()
-                    for f, (_, face) in enumerate(faces):
+                    for f, (_, face, _) in enumerate(faces):
                         areas[t, f] = position.intersect(face).area()
 
                 # find the best one-to-one mapping
@@ -242,7 +243,7 @@ def track(video, shot, detection, output, show_progress=False):
 
                     area = areas[t, f]
 
-                    _, face = faces[f]
+                    _, face, _ = faces[f]
                     faceArea = face.area()
 
                     i, tracker = trackers_[t]
@@ -259,9 +260,9 @@ def track(video, shot, detection, output, show_progress=False):
                             left=int(face.left()), right=int(face.right()),
                             top=int(face.top()), bottom=int(face.bottom())))
 
-                        faces[f] = None, None
+                        faces[f] = None, None, None
 
-            for _, face in faces:
+            for _, face, _ in faces:
 
                 # this face was matched already
                 if face is None:
@@ -320,7 +321,7 @@ def landmark(video, model, tracking, output, show_progress=False):
             # not that T might be differ slightly from t
             # due to different steps in frame iteration
 
-            for identifier, face in faces:
+            for identifier, face, _ in faces:
 
                 boundingBox = dlib.rectangle(
                     int(face.left()), int(face.top()),
