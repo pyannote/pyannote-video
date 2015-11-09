@@ -31,7 +31,7 @@
 Usage:
   pyannote-face detect [--verbose] [options] <video> <output>
   pyannote-face track [--verbose] <video> <shot> <detection> <output>
-  pyannote-face shape [--verbose] <video> <model> <tracking> <output>
+  pyannote-face landmark [--verbose] <video> <model> <tracking> <output>
   pyannote-face (-h | --help)
   pyannote-face --version
 
@@ -291,8 +291,7 @@ def track(video, shot, detection, output, show_progress=False):
                     left=int(face.left()), right=int(face.right()),
                     top=int(face.top()), bottom=int(face.bottom())))
 
-
-def shape(video, model, tracking, output, show_progress=False):
+def landmark(video, model, tracking, output, show_progress=False):
     """Facial features detection"""
 
     # frame generator
@@ -380,10 +379,10 @@ if __name__ == '__main__':
               show_progress=verbose)
 
     # facial features detection
-    if arguments['shape']:
+    if arguments['landmark']:
 
         tracking = arguments['<tracking>']
         model = arguments['<model>']
         output = arguments['<output>']
-        shape(video, model, tracking, output,
+        landmark(video, model, tracking, output,
               show_progress=verbose)
