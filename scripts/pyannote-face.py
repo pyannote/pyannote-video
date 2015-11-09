@@ -41,12 +41,19 @@ Options:
   --smallest=<size>         (Approximate) size of smallest face [default: 36].
   --from=<sec>              Encode demo from <sec> seconds [default: 0].
   --until=<sec>             Encode demo until <sec> seconds.
+  --min-overlap=<ratio>     Associates face with tracker if overlap is greater
+                            than <ratio> [default: 0.5].
+  --min-confidence=<float>  Reset trackers with confidence lower than <float>
+                            [default: 10.].
   -h --help                 Show this screen.
   --version                 Show version.
   --verbose                 Show progress.
 """
 
 SMALLEST_DEFAULT = 36
+MIN_OVERLAP_RATIO = 0.5
+MIN_CONFIDENCE = 10.
+
 from docopt import docopt
 from pyannote.video import __version__
 from pyannote.video import Video
@@ -174,7 +181,10 @@ def detect(video, output, step=None, upscale=1, show_progress=False):
                     top=boundingBox.top(), bottom=boundingBox.bottom()))
 
 
-def track(video, shot, detection, output, show_progress=False):
+def track(video, shot, detection, output,
+          min_overlap_ratio=MIN_OVERLAP_RATIO,
+          min_confidence=MIN_CONFIDENCE,
+          show_progress=False):
     """Tracking by detection"""
 
     # frame generator
@@ -222,6 +232,13 @@ def track(video, shot, detection, output, show_progress=False):
             for i, tracker in trackers.items():
                 confidences[i] = tracker.update(gray)
 
+            # reset trackers when it looses confidence
+            for i, tracker in list(trackers.items()):
+                if confidences[i] < min_confidence:
+                    del trackers[i]
+                    del confidences[i]
+
+            # set of (yet) un-associated trackers
             unmatched = set(trackers)
 
             Nt, Nf = len(trackers), len(faces)
@@ -254,7 +271,8 @@ def track(video, shot, detection, output, show_progress=False):
 
                     # if enough overlap,
                     # re-intialize tracker and mark face as matched
-                    if (2 * area > faceArea) or (2 * area > trackerArea):
+                    if ((area > faceArea * min_overlap_ratio) or
+                        (area > trackerArea * min_overlap_ratio)):
                         tracker.start_track(gray, face)
                         unmatched.remove(i)
 
@@ -436,8 +454,11 @@ if __name__ == '__main__':
         shot = arguments['<shot>']
         detection = arguments['<detection>']
         output = arguments['<output>']
+        min_overlap_ratio = float(arguments['--min-overlap'])
+        min_confidence = float(arguments['--min-confidence'])
         track(video, shot, detection, output,
-              show_progress=verbose)
+              min_overlap_ratio=min_overlap_ratio,
+              min_confidence=min_confidence, show_progress=verbose)
 
     # facial features detection
     if arguments['landmark']:
