@@ -238,12 +238,12 @@ def detect(video, output, step=None, upscale=1, show_progress=False):
 
             for boundingBox in faceDetector(gray, upscale):
 
-                identifier = identifier + 1
-
                 foutput.write(FACE_TEMPLATE.format(
                     t=t, identifier=identifier, confidence=-1,
                     left=boundingBox.left(), right=boundingBox.right(),
                     top=boundingBox.top(), bottom=boundingBox.bottom()))
+
+                identifier = identifier + 1
 
 
 def track(video, shot, detection, output,
@@ -355,7 +355,6 @@ def track(video, shot, detection, output,
                     continue
 
                 # new tracker
-                identifier = identifier + 1
                 tracker = dlib.correlation_tracker()
                 tracker.start_track(gray, face)
                 confidences[identifier] = tracker.update(gray)
@@ -365,6 +364,8 @@ def track(video, shot, detection, output,
                     t=T, identifier=identifier, confidence=0.000,
                     left=int(face.left()), right=int(face.right()),
                     top=int(face.top()), bottom=int(face.bottom())))
+
+                identifier = identifier + 1
 
             for i, tracker in trackers.items():
 
