@@ -28,6 +28,10 @@
 
 """Face detection and tracking
 
+The standard pipeline is the following (with optional face tracking)
+
+ face detection => face tracking => landmark detection => feature extraction
+
 Usage:
   pyannote-face detect [--verbose] [options] <video> <output>
   pyannote-face track [--verbose] <video> <shot> <detection> <output>
