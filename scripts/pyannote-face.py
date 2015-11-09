@@ -32,12 +32,15 @@ Usage:
   pyannote-face detect [--verbose] [options] <video> <output>
   pyannote-face track [--verbose] <video> <shot> <detection> <output>
   pyannote-face landmark [--verbose] <video> <model> <tracking> <output>
+  pyannote-face demo [--from=<sec>] [--until=<sec>] <video> <tracking> <output>
   pyannote-face (-h | --help)
   pyannote-face --version
 
 Options:
   --every=<msec>            Process one frame every <msec> milliseconds.
   --smallest=<size>         (Approximate) size of smallest face [default: 36].
+  --from=<sec>              Encode demo from <sec> seconds [default: 0].
+  --until=<sec>             Encode demo until <sec> seconds.
   -h --help                 Show this screen.
   --version                 Show version.
   --verbose                 Show progress.
@@ -336,6 +339,63 @@ def landmark(video, model, tracking, output, show_progress=False):
                 foutput.write('\n')
 
 
+def get_fl(tracking):
+
+    COLORS = [
+        (240, 163, 255), (  0, 117, 220), (153,  63,   0), ( 76,   0,  92),
+        ( 25,  25,  25), (  0,  92,  49), ( 43, 206,  72), (255, 204, 153),
+        (128, 128, 128), (148, 255, 181), (143, 124,   0), (157, 204,   0),
+        (194,   0, 136), (  0,  51, 128), (255, 164,   5), (255, 168, 187),
+        ( 66, 102,   0), (255,   0,  16), ( 94, 241, 242), (  0, 153, 143),
+        (224, 255, 102), (116,  10, 255), (153,   0,   0), (255, 255, 128),
+        (255, 255,   0), (255,  80,   5)
+    ]
+
+    faceGenerator = getFaceGenerator(tracking)
+    faceGenerator.send(None)
+
+    def overlay(get_frame, timestamp):
+        frame = get_frame(timestamp)
+        height, width, _ = frame.shape
+        _, faces = faceGenerator.send(timestamp)
+
+        cv2.putText(frame, '{t:.3f}'.format(t=timestamp), (10, height-10),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1, 8, False)
+        for identifier, face, confidence in faces:
+            color = COLORS[identifier % len(COLORS)]
+
+            # Draw face bounding box
+            pt1 = (int(face.left()), int(face.top()))
+            pt2 = (int(face.right()), int(face.bottom()))
+            cv2.rectangle(frame, pt1, pt2, color, 2)
+
+            # Print tracker identifier
+            cv2.putText(frame, '#{identifier:d}'.format(identifier=identifier),
+                        (pt1[0] + 2, pt1[1] - 2), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, color, 1, 8, False)
+
+            # Print tracker confidence
+            cv2.putText(frame,
+                        '{confidence:d}'.format(confidence=int(confidence)),
+                        (pt1[0] + 2, pt2[1] - 2), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, color, 1, 8, False)
+        return frame
+
+    return overlay
+
+
+def demo(filename, tracking, output, t_start=0, t_end=None):
+
+    import os
+    os.environ['IMAGEIO_FFMPEG_EXE'] = 'ffmpeg'
+    from moviepy.video.io.VideoFileClip import VideoFileClip
+
+    original_clip = VideoFileClip(filename)
+    modified_clip = original_clip.fl(get_fl(tracking))
+    cropped_clip = modified_clip.subclip(t_start=t_start, t_end=t_end)
+    cropped_clip.write_videofile(output, audio=False)
+
+
 if __name__ == '__main__':
 
     # parse command line arguments
@@ -387,3 +447,13 @@ if __name__ == '__main__':
         output = arguments['<output>']
         landmark(video, model, tracking, output,
               show_progress=verbose)
+    if arguments['demo']:
+
+        tracking = arguments['<tracking>']
+        output = arguments['<output>']
+
+        t_start = float(arguments['--from'])
+        t_end = arguments['--until']
+        t_end = float(t_end) if t_end else None
+
+        demo(filename, tracking, output, t_start=t_start, t_end=t_end)
