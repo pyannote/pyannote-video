@@ -32,4 +32,6 @@ del get_versions
 
 
 from .video import Video
-__all__ = ['Video']
+from .face import Face
+
+__all__ = ['Video', 'Face']
