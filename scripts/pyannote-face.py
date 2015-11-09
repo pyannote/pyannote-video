@@ -32,6 +32,7 @@ Usage:
   pyannote-face detect [--verbose] [options] <video> <output>
   pyannote-face track [--verbose] <video> <shot> <detection> <output>
   pyannote-face landmark [--verbose] <video> <model> <tracking> <output>
+  pyannote-face features [--verbose] <video> <model> <landmark> <output>
   pyannote-face demo [--from=<sec>] [--until=<sec>] <video> <tracking> <output>
   pyannote-face (-h | --help)
   pyannote-face --version
@@ -56,8 +57,10 @@ MIN_CONFIDENCE = 10.
 
 from docopt import docopt
 from pyannote.video import __version__
-from pyannote.video import Video
+from pyannote.video.video import Video
+from pyannote.video.face import Face
 
+from six.moves import zip
 from tqdm import tqdm
 from munkres import Munkres
 import numpy as np
@@ -141,6 +144,64 @@ def getFaceGenerator(detection):
 
         while True:
             t = yield t, []
+
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s2,s3), (s4, s5), ..."
+    a = iter(iterable)
+    return zip(a, a)
+
+
+def getShapeGenerator(shape):
+    """Parse precomputed shape file and generate timestamped shapes"""
+
+    # t is the time sent by the frame generator
+    t = yield
+
+    with open(shape, 'r') as f:
+
+        shapes = []
+        currentT = None
+
+        for line in f:
+
+            # parse line
+            # time, identifier, x1, y1, ..., x68, y68
+            tokens = line.strip().split()
+            T = float(tokens[0])
+            identifier = int(tokens[1])
+            landmarks = np.float32(list(pairwise(
+                [int(token) for token in tokens[2:]])))
+
+            # load all shapes from current frame
+            # and only those shapes
+            if T == currentT or currentT is None:
+                shapes.append((identifier, landmarks))
+                currentT = T
+                continue
+
+            # once all shapes at current time are loaded
+            # wait until t reaches current time
+            # then returns all shapes at once
+
+            while True:
+
+                # wait...
+                if currentT > t:
+                    t = yield t, []
+                    continue
+
+                # return all shapes at once
+                t = yield currentT, shapes
+
+                # reset current time and corresponding shapes
+                shapes = [(identifier, landmarks)]
+                currentT = T
+                break
+
+        while True:
+            t = yield t, []
+
 
 
 def detect(video, output, step=None, upscale=1, show_progress=False):
@@ -356,6 +417,40 @@ def landmark(video, model, tracking, output, show_progress=False):
                     foutput.write(' {x:d} {y:d}'.format(x=x, y=y))
                 foutput.write('\n')
 
+def features(video, model, shape, output, show_progress=False):
+    """Openface FaceNet feature extraction"""
+
+    face = Face(size=96, normalization='affine', openface=model)
+
+    # frame generator
+    frames = video.iterframes(with_time=True)
+    if show_progress:
+        frames = tqdm(iterable=frames,
+                      total=video.duration * video.fps,
+                      leave=True, mininterval=1.,
+                      unit='frames', unit_scale=True)
+
+    # shape generator
+    shapeGenerator = getShapeGenerator(shape)
+    shapeGenerator.send(None)
+
+    with open(output, 'w') as foutput:
+
+        for timestamp, frame in frames:
+
+            T, shapes = shapeGenerator.send(timestamp)
+
+            for identifier, landmarks in shapes:
+
+                normalized = face._get_normalized(frame, landmarks)
+                openface = face._get_openface(normalized)
+
+                foutput.write('{t:.3f} {identifier:d}'.format(
+                    t=T, identifier=identifier))
+                for x in openface:
+                    foutput.write(' {x:.5f}'.format(x=x))
+                foutput.write('\n')
+
 
 def get_fl(tracking):
 
@@ -469,6 +564,15 @@ if __name__ == '__main__':
         output = arguments['<output>']
         landmark(video, model, tracking, output,
               show_progress=verbose)
+
+    if arguments['features']:
+
+        model = arguments['<model>']
+        shape = arguments['<landmark>']
+        output = arguments['<output>']
+        features(video, model, shape, output,
+                 show_progress=verbose)
+
     if arguments['demo']:
 
         tracking = arguments['<tracking>']
