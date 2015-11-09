@@ -36,13 +36,14 @@ Usage:
   pyannote-face --version
 
 Options:
-  --every=<msec>       Process one frame every <msec> milliseconds.
-  --smallest=<size>    (approximate) size of smallest face [default: 36].
-  -h --help            Show this screen.
-  --version            Show version.
-  --verbose            Show progress.
+  --every=<msec>            Process one frame every <msec> milliseconds.
+  --smallest=<size>         (Approximate) size of smallest face [default: 36].
+  -h --help                 Show this screen.
+  --version                 Show version.
+  --verbose                 Show progress.
 """
 
+SMALLEST_DEFAULT = 36
 from docopt import docopt
 from pyannote.video import __version__
 from pyannote.video import Video
@@ -54,7 +55,6 @@ import cv2
 
 import dlib
 
-SMALLEST_DEFAULT = 36
 
 FACE_TEMPLATE = ('{t:.3f} {identifier:d} '
                  '{left:d} {top:d} {right:d} {bottom:d} '
