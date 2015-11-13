@@ -36,7 +36,7 @@ Usage:
   pyannote-face detect [--verbose] [options] <video> <output>
   pyannote-face track [--verbose] <video> <shot> <detection> <output>
   pyannote-face landmark [--verbose] <video> <model> <tracking> <output>
-  pyannote-face features [--verbose] <video> <model> <landmark> <output>
+  pyannote-face features [--verbose] <video> <dlib> <openface> <tracking> <output>
   pyannote-face demo [--from=<sec>] [--until=<sec>] <video> <tracking> <output>
   pyannote-face (-h | --help)
   pyannote-face --version
@@ -62,7 +62,7 @@ MIN_CONFIDENCE = 10.
 from docopt import docopt
 from pyannote.video import __version__
 from pyannote.video.video import Video
-from pyannote.video.face import Face
+from pyannote.video.openface_legacy import Face
 
 from six.moves import zip
 from tqdm import tqdm
@@ -99,11 +99,13 @@ def getShotGenerator(shotFile):
                 break
 
 
-def getFaceGenerator(detection):
+def getFaceGenerator(detection, integer=False):
     """Parse precomputed face file and generate timestamped faces"""
 
     # t is the time sent by the frame generator
     t = yield
+
+    rectangle = dlib.rectangle if integer else dlib.drectangle
 
     with open(detection, 'r') as f:
 
@@ -117,7 +119,7 @@ def getFaceGenerator(detection):
             tokens = line.strip().split()
             T = float(tokens[0])
             identifier = int(tokens[1])
-            face = dlib.drectangle(*[int(token) for token in tokens[2:6]])
+            face = rectangle(*[int(token) for token in tokens[2:6]])
             confidence = float(tokens[6])
 
             # load all faces from current frame
@@ -423,10 +425,45 @@ def landmark(video, model, tracking, output, show_progress=False):
                     foutput.write(' {x:d} {y:d}'.format(x=x, y=y))
                 foutput.write('\n')
 
-def features(video, model, shape, output, show_progress=False):
+# def features(video, model, shape, output, show_progress=False):
+#     """Openface FaceNet feature extraction"""
+#
+#     face = Face(size=96, normalization='affine', openface=model)
+#
+#     # frame generator
+#     frames = video.iterframes(with_time=True)
+#     if show_progress:
+#         frames = tqdm(iterable=frames,
+#                       total=video.duration * video.fps,
+#                       leave=True, mininterval=1.,
+#                       unit='frames', unit_scale=True)
+#
+#     # shape generator
+#     shapeGenerator = getShapeGenerator(shape)
+#     shapeGenerator.send(None)
+#
+#     with open(output, 'w') as foutput:
+#
+#         for timestamp, frame in frames:
+#
+#             T, shapes = shapeGenerator.send(timestamp)
+#
+#             for identifier, landmarks in shapes:
+#
+#                 normalized = face._get_normalized(frame, landmarks)
+#                 openface = face._get_openface(normalized)
+#
+#                 foutput.write('{t:.3f} {identifier:d}'.format(
+#                     t=T, identifier=identifier))
+#                 for x in openface:
+#                     foutput.write(' {x:.5f}'.format(x=x))
+#                 foutput.write('\n')
+
+
+def features(video, dlib_model, openface_model, detection, output, show_progress=False):
     """Openface FaceNet feature extraction"""
 
-    face = Face(size=96, normalization='affine', openface=model)
+    face = Face(landmarks=dlib_model, openface=openface_model, size=96)
 
     # frame generator
     frames = video.iterframes(with_time=True)
@@ -437,25 +474,25 @@ def features(video, model, shape, output, show_progress=False):
                       unit='frames', unit_scale=True)
 
     # shape generator
-    shapeGenerator = getShapeGenerator(shape)
-    shapeGenerator.send(None)
+    faceGenerator = getFaceGenerator(detection, integer=True)
+    faceGenerator.send(None)
 
     with open(output, 'w') as foutput:
 
         for timestamp, frame in frames:
 
-            T, shapes = shapeGenerator.send(timestamp)
+            T, faces = faceGenerator.send(timestamp)
 
-            for identifier, landmarks in shapes:
+            for identifier, boundingBox, _ in faces:
 
-                normalized = face._get_normalized(frame, landmarks)
-                openface = face._get_openface(normalized)
+                openface = face.openface(frame, boundingBox)
 
                 foutput.write('{t:.3f} {identifier:d}'.format(
                     t=T, identifier=identifier))
                 for x in openface:
                     foutput.write(' {x:.5f}'.format(x=x))
                 foutput.write('\n')
+
 
 
 def get_fl(tracking):
@@ -573,10 +610,11 @@ if __name__ == '__main__':
 
     if arguments['features']:
 
-        model = arguments['<model>']
-        shape = arguments['<landmark>']
+        dlib_model = arguments['<dlib>']
+        openface_model = arguments['<openface>']
+        tracking = arguments['<tracking>']
         output = arguments['<output>']
-        features(video, model, shape, output,
+        features(video, dlib_model, openface_model, tracking, output,
                  show_progress=verbose)
 
     if arguments['demo']:
