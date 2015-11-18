@@ -80,23 +80,23 @@ class Face(object):
         if openface is not None:
             self._net = TorchWrap(model=openface, size=self.size, cuda=False)
 
-    def iterfaces(self, image):
+    def iterfaces(self, bgr):
         """Iterate over all detected faces"""
-        for face in self._faceDetector(image, self._upscale):
+        for face in self._faceDetector(bgr, self._upscale):
             yield face
 
-    def getLargestFaceBoundingBox(self, image):
-        faces = list(self.iterfaces(image))
+    def getLargestFaceBoundingBox(self, bgr):
+        faces = list(self.iterfaces(bgr))
         if len(faces) > 0:
             return max(faces, key=lambda rect: rect.width() * rect.height())
 
-    def _get_landmarks(self, image, face):
-        points = self._landmarksDetector(image, face)
+    def _get_landmarks(self, bgr, face):
+        points = self._landmarksDetector(bgr, face)
         return list(map(lambda p: (p.x, p.y), points.parts()))
 
-    def normalize(self, image, face):
+    def normalize(self, bgr, face):
 
-        alignPoints = self._get_landmarks(image, face)
+        alignPoints = self._get_landmarks(bgr, face)
         meanAlignPoints = self.transformPoints(self._landmarks, face, True)
 
         (xs, ys) = zip(*meanAlignPoints)
@@ -109,7 +109,7 @@ class Face(object):
         npAlignPointsSS = npAlignPoints[EYES_AND_BOTTOM_LIP]
         npMeanAlignPointsSS = npMeanAlignPoints[EYES_AND_BOTTOM_LIP]
         H = cv2.getAffineTransform(npAlignPointsSS, npMeanAlignPointsSS)
-        warpedImg = cv2.warpAffine(image, H, np.shape(image)[0:2])
+        warpedImg = cv2.warpAffine(bgr, H, np.shape(bgr)[0:2])
 
         wBb = self.getLargestFaceBoundingBox(warpedImg)
         if wBb is None:
@@ -144,8 +144,8 @@ class Face(object):
     def _get_openface(self, normalized):
         return self._net.forwardImage(normalized)
 
-    def openface(self, image, face):
-        normalized = self.normalize(image, face)
+    def openface(self, bgr, face):
+        normalized = self.normalize(bgr, face)
         if normalized is None:
             return [0.] * 128
         return self._get_openface(normalized)
