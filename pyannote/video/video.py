@@ -96,26 +96,29 @@ class Video:
 
         self.filename = filename
         self.ffmpeg = ffmpeg
-        infos = self._parse_infos(print_infos=debug, check_duration=True)
-        self.fps = infos['video_fps']
-        self.size = infos['video_size']
-        self.duration = infos['video_duration']
-        self.ffmpeg_duration = infos['duration']
-        self.nframes = infos['video_nframes']
+        self.debug = debug
 
-        self.infos = infos
+        infos = self._parse_infos(print_infos=self.debug, check_duration=True)
+        self._fps = infos['video_fps']
+        self._size = infos['video_size']
+        self._duration = infos['video_duration']
+        # self.ffmpeg_duration = infos['duration']
+        self._nframes = infos['video_nframes']
 
-        self.pix_fmt = 'rgb24'
-        self.depth = 3
 
-        w, h = self.size
-        bufsize = self.depth * w * h + 100
+        # self.infos = infos
 
-        self.bufsize = bufsize
+        self._pix_fmt = 'rgb24'
+        self._depth = 3
+
+        w, h = self._size
+        bufsize = self._depth * w * h + 100
+
+        self._bufsize = bufsize
         self._initialize()
 
-        self.pos = 1
-        self.lastread = self._read_frame()
+        self._pos = 1
+        self._lastread = self._read_frame()
 
     def _parse_infos(self, print_infos=False, check_duration=True):
         """Get file infos using ffmpeg.
@@ -276,9 +279,9 @@ class Video:
         cmd = (
             [self.ffmpeg] + i_arg +
             ['-loglevel', 'error', '-f', 'image2pipe',
-             '-pix_fmt', self.pix_fmt, '-vcodec', 'rawvideo', '-'])
+             '-pix_fmt', self._pix_fmt, '-vcodec', 'rawvideo', '-'])
 
-        popen_params = {"bufsize": self.bufsize,
+        popen_params = {"bufsize": self._bufsize,
                         "stdout": sp.PIPE,
                         "stderr": sp.PIPE,
                         "stdin": DEVNULL}
@@ -286,21 +289,21 @@ class Video:
         if os.name == "nt":
             popen_params["creationflags"] = 0x08000000
 
-        self.proc = sp.Popen(cmd, **popen_params)
+        self._proc = sp.Popen(cmd, **popen_params)
 
     def _skip_frames(self, n=1):
         """Reads and throws away n frames """
-        w, h = self.size
+        w, h = self._size
         for _ in range(n):
-            self.proc.stdout.read(self.depth*w*h)
-            # self.proc.stdout.flush()
-        self.pos += n
+            self._proc.stdout.read(self._depth*w*h)
+            # self._proc.stdout.flush()
+        self._pos += n
 
     def _read_frame(self):
-        w, h = self.size
-        nbytes = self.depth*w*h
+        w, h = self._size
+        nbytes = self._depth*w*h
 
-        s = self.proc.stdout.read(nbytes)
+        s = self._proc.stdout.read(nbytes)
 
         if len(s) != nbytes:
 
@@ -308,8 +311,8 @@ class Video:
                 "Warning: in file %s, " % (self.filename) +
                 "%d bytes wanted but %d bytes read," % (nbytes, len(s)) +
                 "at frame %d/%d, at time %.02f/%.02f sec. " % (
-                    self.pos, self.nframes, 1.0 * self.pos / self.fps,
-                    self.duration) +
+                    self._pos, self._nframes, 1.0 * self._pos / self._fps,
+                    self._duration) +
                 "Using the last valid frame instead.",
                 UserWarning)
 
@@ -324,14 +327,14 @@ class Video:
                 )
                 raise IOError(message % self.filename)
 
-            result = self.lastread
+            result = self._lastread
 
         else:
 
             result = np.fromstring(s, dtype='uint8')
             # reshape((h, w, len(s)//(w*h)))
             result.shape = (h, w, len(s)//(w*h))
-            self.lastread = result
+            self._lastread = result
 
         return result
 
@@ -392,7 +395,6 @@ class Video:
                 if len(frames) < context:
                     continue
 
-
             f_ = frames if with_context else frame
 
             if with_time:
@@ -429,28 +431,28 @@ class Video:
         # robust in the case where you get the nth frame by writing
         # _get_frame(n/fps).
 
-        pos = int(self.fps*t + 0.00001)+1
+        pos = int(self._fps * t + 0.00001)+1
 
-        if pos == self.pos:
-            return self.lastread
+        if pos == self._pos:
+            return self._lastread
         else:
-            if(pos < self.pos) or (pos > self.pos+100):
+            if(pos < self._pos) or (pos > self._pos+100):
                 self._initialize(t)
-                self.pos = pos
+                self._pos = pos
             else:
-                self._skip_frames(pos-self.pos-1)
+                self._skip_frames(pos-self._pos-1)
             result = self._read_frame()
-            self.pos = pos
+            self._pos = pos
             return result
 
     def _close(self):
-        if hasattr(self, 'proc'):
-            self.proc.terminate()
-            self.proc.stdout.close()
-            self.proc.stderr.close()
-            del self.proc
+        if hasattr(self, '_proc'):
+            self._proc.terminate()
+            self._proc.stdout.close()
+            self._proc.stderr.close()
+            del self._proc
 
     def __del__(self):
         self._close()
         if hasattr(self, 'lastread'):
-            del self.lastread
+            del self._lastread
