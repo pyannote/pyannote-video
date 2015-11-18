@@ -92,7 +92,22 @@ def _cvsecs(time):
 
 class Video:
 
-    def __init__(self, filename, ffmpeg='ffmpeg', debug=False):
+    def __init__(self, filename, start=None, end=None, step=None,
+                 ffmpeg='ffmpeg', debug=False):
+        """
+        Parameters
+        ----------
+        start : float, optional
+            Begin iterating frames at time `start` (in seconds).
+            Defaults to 0.
+        end : float, optional
+            Stop iterating frames at time `end` (in seconds).
+            Defaults to video duration.
+        step : float, optional
+            Iterate frames every `step` seconds.
+            Defaults to iterating every frame.
+
+        """
 
         self.filename = filename
         self.ffmpeg = ffmpeg
@@ -105,6 +120,12 @@ class Video:
         # self.ffmpeg_duration = infos['duration']
         self._nframes = infos['video_nframes']
 
+        self.start = 0. if start is None else start
+        self.end = self._duration if end is None else end
+        self.step = 1./self._fps if step is None else step
+
+        # TODO warning if step != N x 1/fps (where N is an integer)
+        # warnings.warn(message, UserWarning)
 
         # self.infos = infos
 
@@ -341,21 +362,11 @@ class Video:
     def __iter__(self):
         return self.iterframes()
 
-    def iterframes(self, start=None, end=None, step=None, with_time=False,
-                   with_context=False, context=1):
+    def iterframes(self, with_time=False, with_context=False, context=1):
         """Iterate over video frames
 
         Parameters
         ----------
-        start : float
-            Begin iterating frames at time `start` (in seconds).
-            Defaults to 0.
-        end : float
-            Stop iterating frames at time `end` (in seconds).
-            Defaults to video duration.
-        step : float
-            Iterate frames every `step` seconds.
-            Defaults to iterating every frame.
         with_time : boolean
             When True, yields (time, frame).
         with_context : {False, 'left', 'right', 'center'}
@@ -364,27 +375,13 @@ class Video:
             Number of contextual frames. Defaults to 1.
         """
 
-        # default: starts from the beginning
-        if start is None:
-            start = 0.
-
-        # default: iterates until the end
-        if end is None:
-            end = self.duration
-
-        # default: frame by frame
-        if step is None:
-            step = 1./self.fps
-
-        # TODO warning if step != N x 1/fps (where N is an integer)
-        # warnings.warn(message, UserWarning)
 
         # initialize buffer of contextual frames
         if with_context:
             frames = deque([], context)
             timestamps = deque([], context)
 
-        for t in np.arange(start, end, step):
+        for t in np.arange(self.start, self.end, self.step):
 
             frame = self._get_frame(t)
 
