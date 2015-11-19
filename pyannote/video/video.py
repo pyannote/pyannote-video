@@ -38,7 +38,7 @@ import warnings
 import logging
 import numpy as np
 from collections import deque
-
+from tqdm import tqdm
 
 logging.captureWarnings(True)
 
@@ -113,7 +113,7 @@ class Video:
         self.ffmpeg = ffmpeg
         self.debug = debug
 
-        infos = self._parse_infos(print_infos=self.debug, check_duration=True)
+        infos = self._parse_infos(print_infos=False, check_duration=True)
         self._fps = infos['video_fps']
         self._size = infos['video_size']
         self._duration = infos['video_duration']
