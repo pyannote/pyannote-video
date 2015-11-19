@@ -60,7 +60,7 @@ def product_lookahead(iterable, lookahead):
 
 
 class Thread(object):
-    """
+    """Shot threading based on ORB features
 
     Can also be used as post-processing to clean up a (possibly over-segmented)
     segmentation into shots.
