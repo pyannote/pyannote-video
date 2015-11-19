@@ -360,7 +360,7 @@ class Video:
         return result
 
     def __iter__(self):
-        return self.iterframes()
+        return self.iterframes(with_time=True)
 
     def iterframes(self, with_time=False, with_context=False, context=1):
         """Iterate over video frames
