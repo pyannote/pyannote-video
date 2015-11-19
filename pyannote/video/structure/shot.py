@@ -37,18 +37,40 @@ OPENCV = int(cv2.__version__.split('.')[0])
 
 
 class Shot(object):
+    """Shot boundary detection based on displaced frame difference
 
-    def __init__(self, video, threshold=1.2, kernel_size=49, verbose=False):
+    Parameters
+    ----------
+    video : Video
+    height : int, optional
+        Resize video to this height, in pixels. Defaults to 50.
+    context : float, optional
+        Median filtering context (in seconds). Defaults to 2.
+    threshold : float, optional
+        Defaults to 1.
+    """
+
+    def __init__(self, video, height=50, context=2.0, threshold=1.0):
         super(Shot, self).__init__()
         self.video = video
+        self.height = height
         self.threshold = threshold
-        self.kernel_size = kernel_size
+        self.context = context
+
+        # estimate new size from video size and target height
+        w, h = self.video._size
+        self._resize = (self.height, w * self.height / h)
+
+        # estimate kernel size from context and video step
+        kernel_size = self.context / self.video.step
+        # kernel size must be an odd number greater than 3
+        self._kernel_size = max(3, int(np.ceil(kernel_size) // 2 * 2 + 1))
+
         self._reconstruct = None
 
-    def _convert(self, rgb, n=8):
+    def _convert(self, rgb):
         gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-        height, width = gray.shape
-        return cv2.resize(gray, (height / n, width / n))
+        return cv2.resize(gray, self._resize)
 
     def dfd(self, previous, current, flow=None):
         """Displaced frame difference"""
@@ -97,7 +119,7 @@ class Shot(object):
         # TODO: running median
         t, y = zip(*self.iter_dfd())
 
-        filtered = scipy.signal.medfilt(y, kernel_size=self.kernel_size)
+        filtered = scipy.signal.medfilt(y, kernel_size=self._kernel_size)
 
         # normalized displaced frame difference
         normalized = (y - filtered) / filtered
