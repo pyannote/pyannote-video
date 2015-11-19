@@ -26,7 +26,6 @@
 # AUTHORS
 # Hervé BREDIN - http://herve.niderb.fr
 
-from tqdm import tqdm
 import cv2
 import itertools
 import numpy as np
@@ -42,7 +41,6 @@ class Shot(object):
     def __init__(self, video, threshold=1.2, kernel_size=49, verbose=False):
         super(Shot, self).__init__()
         self.video = video
-        self.verbose = verbose
         self.threshold = threshold
         self.kernel_size = kernel_size
         self._reconstruct = None
@@ -79,18 +77,10 @@ class Shot(object):
     def iter_dfd(self):
         """Pairwise displaced frame difference"""
 
-        # frame iterator
-        generator = self.video.iterframes(with_time=True)
-        if self.verbose:
-            generator = tqdm(iterable=generator,
-                             total=self.video.duration * self.video.fps,
-                             leave=True, mininterval=1.,
-                             unit='frames', unit_scale=True)
-
         previous = None
 
         # iterate frames one by one
-        for t, rgb in generator:
+        for t, rgb in self.video:
 
             current = self._convert(rgb)
 
