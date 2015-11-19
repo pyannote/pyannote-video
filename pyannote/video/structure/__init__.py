@@ -27,5 +27,6 @@
 # Hervé BREDIN - http://herve.niderb.fr
 
 from .shot import Shot
+from .thread import Thread
 
-__all__ == ['Shot', ]
+__all__ = ['Shot', 'Thread']
