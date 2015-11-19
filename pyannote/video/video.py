@@ -93,7 +93,7 @@ def _cvsecs(time):
 class Video:
 
     def __init__(self, filename, start=None, end=None, step=None,
-                 ffmpeg='ffmpeg', debug=False):
+                 ffmpeg='ffmpeg', verbose=False):
         """
         Parameters
         ----------
@@ -106,12 +106,14 @@ class Video:
         step : float, optional
             Iterate frames every `step` seconds.
             Defaults to iterating every frame.
+        verbose : bool, optional
 
         """
 
         self.filename = filename
         self.ffmpeg = ffmpeg
         self.debug = debug
+        self.verbose = verbose
 
         infos = self._parse_infos(print_infos=False, check_duration=True)
         self._fps = infos['video_fps']
@@ -375,13 +377,19 @@ class Video:
             Number of contextual frames. Defaults to 1.
         """
 
-
         # initialize buffer of contextual frames
         if with_context:
             frames = deque([], context)
             timestamps = deque([], context)
 
-        for t in np.arange(self.start, self.end, self.step):
+        generator = np.arange(self.start, self.end, self.step)
+        if self.verbose:
+            generator = tqdm(iterable=generator,
+                             total=(self.end - self.start) / self.step,
+                             leave=True, mininterval=1.,
+                             unit='frames', unit_scale=True)
+
+        for t in generator:
 
             frame = self._get_frame(t)
 
