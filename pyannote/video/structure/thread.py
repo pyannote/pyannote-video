@@ -33,6 +33,7 @@ import cv2
 import networkx as nx
 from pyannote.core import Annotation
 from pyannote.core.time import _t_iter as getLabelGenerator
+from tqdm import tqdm
 
 try:
     # Python 3
@@ -77,12 +78,13 @@ class Thread(object):
         super(Thread, self).__init__()
 
         self.video = video
-        self.verbose = True
 
         self.lookahead = lookahead
         if shot is None:
             shot = Shot(video)
         self.shot = shot
+
+        self.verbose = verbose
 
         # ORB (non-patented SIFT alternative) extraction
         self._orb = cv2.ORB()
@@ -139,7 +141,15 @@ class Thread(object):
         # build threading graph by comparing each shot
         # to 'lookahead' following shots
         threads = nx.Graph()
-        for current, following in product_lookahead(self.shot, self.lookahead):
+
+        generator = product_lookahead(self.shot, self.lookahead)
+        if self.verbose:
+            generator = tqdm(iterable=generator,
+                             total=len(self.shot) * self.lookahead,
+                             leave=True, mininterval=1.,
+                             unit='shot pairs', unit_scale=True)
+
+        for current, following in generator:
             orbLast = self._compute_orb(current.end - collar)
             orbFirst = self._compute_orb(following.start + collar)
             threads.add_node(current)
