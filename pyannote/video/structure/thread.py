@@ -34,6 +34,12 @@ import networkx as nx
 from pyannote.core import Annotation
 from pyannote.core.time import _t_iter as getLabelGenerator
 
+try:
+    # Python 3
+    from functools import lru_cache
+except Exception as e:
+    # Python 2
+    from ..utils.lru_cache import lru_cache
 
 def product_lookahead(iterable, lookahead):
 
@@ -95,7 +101,10 @@ class Thread(object):
 
         self.min_match = min_match
 
-    # TODO / memoize ORB feature extraction
+
+    # _threads_graph method calls _compute_orb with the same "t" over and over.
+    # we cache "maxsize" last calls to avoid recomputing ORB features
+    @lru_cache(maxsize=128, typed=False)
     def _compute_orb(self, t):
         rgb = self.video(t)
         gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
