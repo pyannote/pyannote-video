@@ -112,7 +112,6 @@ class Video:
 
         self.filename = filename
         self.ffmpeg = ffmpeg
-        self.debug = debug
         self.verbose = verbose
 
         infos = self._parse_infos(print_infos=False, check_duration=True)
