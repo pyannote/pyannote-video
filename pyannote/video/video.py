@@ -107,7 +107,9 @@ class Video:
             Iterate frames every `step` seconds.
             Defaults to iterating every frame.
         verbose : bool, optional
-
+            Show a progress bar while iterating the video. Defaults to False.
+        ffmpeg : str, optional
+            Path to ffmpeg command line tool. Defaults to "ffmpeg".
         """
 
         self.filename = filename
