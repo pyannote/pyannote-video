@@ -34,6 +34,7 @@ import networkx as nx
 from pyannote.core import Annotation
 from pyannote.core.time import _t_iter as getLabelGenerator
 from tqdm import tqdm
+import warnings
 
 try:
     # Python 3
@@ -108,9 +109,15 @@ class Thread(object):
     # we cache "maxsize" last calls to avoid recomputing ORB features
     @lru_cache(maxsize=128, typed=False)
     def _compute_orb(self, t):
-        rgb = self.video(t)
-        gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-        _, descriptors = self._orb.detectAndCompute(gray, None)
+        try:
+            rgb = self.video(t)
+            gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+            _, descriptors = self._orb.detectAndCompute(gray, None)
+
+        except IOError as e:
+            warnings.warn("unable to reach t = {t:.3f}".format(t=t))
+            descriptors = None
+
         return descriptors
 
     def _match(self, orb1, orb2):
