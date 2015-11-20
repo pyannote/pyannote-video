@@ -366,6 +366,9 @@ class Video:
     def iterframes(self, with_time=False, with_context=False, context=1):
         """Iterate over video frames
 
+        Frames are generated as H x W x 3 numpy array in RGB order (not BGR).
+        (FYI, OpenCV standard format is BGR, not RGB).
+
         Parameters
         ----------
         with_time : boolean
@@ -390,16 +393,16 @@ class Video:
 
         for t in generator:
 
-            frame = self._get_frame(t)
+            rgb = self._get_frame(t)
 
             # fill buffer of contextual frames
             if with_context:
-                frames.append(frame)
+                frames.append(rgb)
                 timestamps.append(t)
                 if len(frames) < context:
                     continue
 
-            f_ = frames if with_context else frame
+            f_ = frames if with_context else rgb
 
             if with_time:
 
