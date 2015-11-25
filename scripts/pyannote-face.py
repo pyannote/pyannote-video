@@ -30,12 +30,12 @@
 
 The standard pipeline is the following (with optional face tracking)
 
-face detection => (face tracking =>) landmark detection => feature extraction
+face detection => (face tracking =>) landmarks detection => feature extraction
 
 Usage:
   pyannote-face detect [--verbose] [options] <video> <output>
   pyannote-face track [--verbose] <video> <shot> <detection> <output>
-  pyannote-face landmark [--verbose] <video> <model> <tracking> <output>
+  pyannote-face landmarks [--verbose] <video> <model> <tracking> <output>
   pyannote-face features [--verbose] <video> <model> <landmark> <output>
   pyannote-face demo [--from=<sec>] [--until=<sec>] <video> <tracking> <output>
   pyannote-face (-h | --help)
@@ -510,7 +510,7 @@ if __name__ == '__main__':
               min_confidence=min_confidence)
 
     # facial features detection
-    if arguments['landmark']:
+    if arguments['landmarks']:
 
         tracking = arguments['<tracking>']
         model = arguments['<model>']
