@@ -99,11 +99,13 @@ def getShotGenerator(shotFile):
                 break
 
 
-def getFaceGenerator(detection):
+def getFaceGenerator(detection, double=True):
     """Parse precomputed face file and generate timestamped faces"""
 
     # t is the time sent by the frame generator
     t = yield
+
+    rectangle = dlib.drectangle if double else dlib.rectangle
 
     with open(detection, 'r') as f:
 
@@ -117,7 +119,7 @@ def getFaceGenerator(detection):
             tokens = line.strip().split()
             T = float(tokens[0])
             identifier = int(tokens[1])
-            face = dlib.drectangle(*[int(token) for token in tokens[2:6]])
+            face = rectangle(*[int(token) for token in tokens[2:6]])
             confidence = float(tokens[6])
 
             # load all faces from current frame
