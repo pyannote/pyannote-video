@@ -61,11 +61,10 @@ MIN_CONFIDENCE = 10.
 
 from docopt import docopt
 from pyannote.video import __version__
-from pyannote.video.video import Video
+from pyannote.video import Video
 from pyannote.video import Face
 
 from six.moves import zip
-from tqdm import tqdm
 from munkres import Munkres
 import numpy as np
 import cv2
@@ -209,36 +208,20 @@ def getShapeGenerator(shape):
             t = yield t, []
 
 
-
-def detect(video, output, step=None, upscale=1, show_progress=False):
+def detect(video, output, smallest=36):
     """Face detection"""
 
-    # frame iterator
-    generator = video.iterframes(step=step, with_time=True)
-    if show_progress:
-
-        if step is None:
-            total = video.duration * video.fps
-        else:
-            total = video.duration / step
-
-        generator = tqdm(iterable=generator,
-                         total=total,
-                         leave=True, mininterval=1.,
-                         unit='frames', unit_scale=True)
-
     # face detector
-    faceDetector = dlib.get_frontal_face_detector()
+    # faceDetector = dlib.get_frontal_face_detector()
+    face = Face(smallest=smallest)
 
     identifier = 0
 
     with open(output, 'w') as foutput:
 
-        for t, frame in generator:
+        for t, rgb in video:
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-
-            for boundingBox in faceDetector(gray, upscale):
+            for boundingBox in face.iterfaces(rgb):
 
                 foutput.write(FACE_TEMPLATE.format(
                     t=t, identifier=identifier, confidence=0.000,
@@ -250,24 +233,15 @@ def detect(video, output, step=None, upscale=1, show_progress=False):
 
 def track(video, shot, detection, output,
           min_overlap_ratio=MIN_OVERLAP_RATIO,
-          min_confidence=MIN_CONFIDENCE,
-          show_progress=False):
+          min_confidence=MIN_CONFIDENCE):
     """Tracking by detection"""
-
-    # frame generator
-    frames = video.iterframes(with_time=True)
-    if show_progress:
-        frames = tqdm(iterable=frames,
-                      total=video.duration * video.fps,
-                      leave=True, mininterval=1.,
-                      unit='frames', unit_scale=True)
 
     # shot generator
     shotGenerator = getShotGenerator(shot)
     shotGenerator.send(None)
 
     # face generator
-    faceGenerator = getFaceGenerator(detection)
+    faceGenerator = getFaceGenerator(detection, double=True)
     faceGenerator.send(None)
 
     # Hungarian algorithm for face/tracker matching
@@ -279,9 +253,7 @@ def track(video, shot, detection, output,
 
     with open(output, 'w') as foutput:
 
-        for timestamp, frame in frames:
-
-            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        for timestamp, rgb in video:
 
             shot = shotGenerator.send(timestamp)
 
@@ -297,7 +269,7 @@ def track(video, shot, detection, output,
 
             # update all trackers and store their confidence
             for i, tracker in trackers.items():
-                confidences[i] = tracker.update(gray)
+                confidences[i] = tracker.update(rgb)
 
             # reset trackers when it looses confidence
             for i, tracker in list(trackers.items()):
@@ -340,7 +312,7 @@ def track(video, shot, detection, output,
                     # re-intialize tracker and mark face as matched
                     if ((area > faceArea * min_overlap_ratio) or
                         (area > trackerArea * min_overlap_ratio)):
-                        tracker.start_track(gray, face)
+                        tracker.start_track(rgb, face)
                         unmatched.remove(i)
 
                         foutput.write(FACE_TEMPLATE.format(
@@ -358,8 +330,8 @@ def track(video, shot, detection, output,
 
                 # new tracker
                 tracker = dlib.correlation_tracker()
-                tracker.start_track(gray, face)
-                confidences[identifier] = tracker.update(gray)
+                tracker.start_track(rgb, face)
+                confidences[identifier] = tracker.update(rgb)
                 trackers[identifier] = tracker
 
                 foutput.write(FACE_TEMPLATE.format(
@@ -382,47 +354,33 @@ def track(video, shot, detection, output,
                     left=int(face.left()), right=int(face.right()),
                     top=int(face.top()), bottom=int(face.bottom())))
 
-def landmark(video, model, tracking, output, show_progress=False):
+
+def landmark(video, model, tracking, output):
     """Facial features detection"""
 
-    # frame generator
-    frames = video.iterframes(with_time=True)
-    if show_progress:
-        frames = tqdm(iterable=frames,
-                      total=video.duration * video.fps,
-                      leave=True, mininterval=1.,
-                      unit='frames', unit_scale=True)
-
     # face generator
-    faceGenerator = getFaceGenerator(tracking)
+    faceGenerator = getFaceGenerator(tracking, double=False)
     faceGenerator.send(None)
 
-    # facial features detector
-    facialFeaturesDetector = dlib.shape_predictor(model)
+    face = Face(landmarks=model)
 
     with open(output, 'w') as foutput:
 
-        for timestamp, frame in frames:
-
-            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        for timestamp, rgb in video:
 
             # get all detected faces at this time
             T, faces = faceGenerator.send(timestamp)
             # not that T might be differ slightly from t
             # due to different steps in frame iteration
 
-            for identifier, face, _ in faces:
+            for identifier, boundingBox, _ in faces:
 
-                boundingBox = dlib.rectangle(
-                    int(face.left()), int(face.top()),
-                    int(face.right()), int(face.bottom()))
-                points = facialFeaturesDetector(gray, boundingBox)
-                facialFeatures = [(p.x, p.y) for p in points.parts()]
+                landmarks = face._get_landmarks(rgb, boundingBox)
 
                 foutput.write('{t:.3f} {identifier:d}'.format(
                     t=T, identifier=identifier))
-                for x, y in facialFeatures:
-                    foutput.write(' {x:d} {y:d}'.format(x=x, y=y))
+                for x, y in landmarks:
+                    foutput.write(' {x:d} {y:d}'.format(x=int(x), y=int(y)))
                 foutput.write('\n')
 
 def features(video, model, shape, output):
@@ -465,7 +423,7 @@ def get_fl(tracking):
         (255, 255,   0), (255,  80,   5)
     ]
 
-    faceGenerator = getFaceGenerator(tracking)
+    faceGenerator = getFaceGenerator(tracking, double=True)
     faceGenerator.send(None)
 
     def overlay(get_frame, timestamp):
@@ -518,32 +476,26 @@ if __name__ == '__main__':
 
     # initialize video
     filename = arguments['<video>']
-    video = Video(filename)
 
     verbose = arguments['--verbose']
+    # every xxx milliseconds
+    every = arguments['--every']
+    if not every:
+        step = None
+    else:
+        step = 1e-3 * float(arguments['--every'])
+
+    video = Video(filename, step=step, verbose=verbose)
 
     # face detection
     if arguments['detect']:
 
-        # every xxx milliseconds
-        every = arguments['--every']
-        if not every:
-            step = None
-        else:
-            step = 1e-3 * float(arguments['--every'])
-
         # (approximate) size of smallest face
-        smallest = float(arguments['--smallest'])
-        if smallest > SMALLEST_DEFAULT:
-            upscale = 1
-        else:
-            upscale = int(np.ceil(SMALLEST_DEFAULT / smallest))
+        smallest = int(arguments['--smallest'])
 
         output = arguments['<output>']
 
-        detect(video, output,
-               step=step, upscale=upscale,
-               show_progress=verbose)
+        detect(video, output, smallest=smallest)
 
     # face tracking
     if arguments['track']:
@@ -555,7 +507,7 @@ if __name__ == '__main__':
         min_confidence = float(arguments['--min-confidence'])
         track(video, shot, detection, output,
               min_overlap_ratio=min_overlap_ratio,
-              min_confidence=min_confidence, show_progress=verbose)
+              min_confidence=min_confidence)
 
     # facial features detection
     if arguments['landmark']:
@@ -563,8 +515,7 @@ if __name__ == '__main__':
         tracking = arguments['<tracking>']
         model = arguments['<model>']
         output = arguments['<output>']
-        landmark(video, model, tracking, output,
-              show_progress=verbose)
+        landmark(video, model, tracking, output)
 
     # openface features extraction
     if arguments['features']:
@@ -572,8 +523,7 @@ if __name__ == '__main__':
         model = arguments['<model>']
         shape = arguments['<landmark>']
         output = arguments['<output>']
-        features(video, model, shape, output,
-                 show_progress=verbose)
+        features(video, model, shape, output)
 
     if arguments['demo']:
 
