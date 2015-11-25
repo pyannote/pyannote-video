@@ -138,36 +138,36 @@ class Face(object):
 
     # face normalization
 
-    def _homography(self, image, landmarks):
+    def _homography(self, rgb, landmarks):
         H, _ = cv2.findHomography(landmarks, self._landmarks)
-        normalized = cv2.warpPerspective(image, H, (self.size, self.size))
+        normalized = cv2.warpPerspective(rgb, H, (self.size, self.size))
         return normalized
 
-    def _affine(self, image, landmarks):
+    def _affine(self, rgb, landmarks):
         H = cv2.getAffineTransform(
             landmarks[EYES_AND_BOTTOM_LIP],
             self._landmarks[EYES_AND_BOTTOM_LIP])
-        normalized = cv2.warpAffine(image, H, (self.size, self.size))
+        normalized = cv2.warpAffine(rgb, H, (self.size, self.size))
         return normalized
 
-    def _perspective(self, image, landmarks):
+    def _perspective(self, rgb, landmarks):
         H = cv2.getPerspectiveTransform(
             landmarks[EYES_AND_MOUTH],
             self._landmarks[EYES_AND_MOUTH])
-        normalized = cv2.warpPerspective(image, H, (self.size, self.size))
+        normalized = cv2.warpPerspective(rgb, H, (self.size, self.size))
         return normalized
 
-    def _get_normalized(self, image, landmarks):
+    def _get_normalized(self, rgb, landmarks):
         """Return normalized face"""
 
         if self.normalization == 'affine':
-            return self._affine(image, landmarks)
+            return self._affine(rgb, landmarks)
 
         if self.normalization == 'perspective':
-            return self._perspective(image, landmarks)
+            return self._perspective(rgb, landmarks)
 
         if self.normalization == 'homography':
-            return self._homography(image, landmarks)
+            return self._homography(rgb, landmarks)
 
     def normalize(self, rgb, face):
         landmarks = self._get_landmarks(rgb, face)
@@ -175,8 +175,8 @@ class Face(object):
 
     # openface feature extraction
 
-    def _get_openface(self, normalized):
-        return self._net.forwardImage(normalized)
+    def _get_openface(self, bgr):
+        return self._net.forwardImage(bgr)
 
     def openface(self, rgb, face):
         normalized_rgb = self.normalize(rgb, face)
