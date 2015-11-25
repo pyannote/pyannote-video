@@ -39,7 +39,7 @@ Options:
   --version            Show version.
   --verbose            Show progress.
   --pre=<path>         Load/save preprocessed displaced frame difference.
-  --threshold=<float>  Set peak detection threshold [default: 1.2]
+  --threshold=<float>  Set peak detection threshold [default: 1.0]
 """
 from docopt import docopt
 
