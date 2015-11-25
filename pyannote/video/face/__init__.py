@@ -25,12 +25,3 @@
 
 # AUTHORS
 # Hervé BREDIN - http://herve.niderb.fr
-
-from ._version import get_versions
-__version__ = get_versions()['version']
-del get_versions
-
-from .video import Video
-from .face.face import Face
-
-__all__ = ['Video', 'Face']

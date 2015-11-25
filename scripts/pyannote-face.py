@@ -62,7 +62,7 @@ MIN_CONFIDENCE = 10.
 from docopt import docopt
 from pyannote.video import __version__
 from pyannote.video.video import Video
-from pyannote.video.face import Face
+from pyannote.video import Face
 
 from six.moves import zip
 from tqdm import tqdm

@@ -70,14 +70,18 @@ TEMPLATE = np.float32([
     (0.672409137852, 0.744177032192), (0.572539621444, 0.776609286626),
     (0.5240106503, 0.783370783245), (0.477561227414, 0.778476346951)])
 
+m, M = np.min(TEMPLATE, axis=0), np.max(TEMPLATE, axis=0)
+MINMAX_TEMPLATE = (TEMPLATE - m) / (M - m)
+
+EYES_AND_BOTTOM_LIP = np.array([39, 42, 57])
 EYES_AND_NOSE = np.array([39, 42, 33])
 EYES_AND_MOUTH = np.array([39, 42, 48, 54])
 
 class Face(object):
 
-    def __init__(self, landmarks=None, smallest=SMALLEST_DEFAULT, size=96,
-                 normalization='affine', openface=None):
-        """Face detection and normalization
+    def __init__(self, landmarks=None, smallest=SMALLEST_DEFAULT,
+                 normalization='affine', openface=None, size=96):
+        """Face detection
 
         Parameters
         ----------
@@ -108,7 +112,7 @@ class Face(object):
 
         # normalization
         self.size = size
-        self._landmarks = TEMPLATE * self.size
+        self._landmarks = MINMAX_TEMPLATE * self.size
         self.normalization = normalization
 
         if openface is not None:
@@ -116,21 +120,21 @@ class Face(object):
 
     # face detection
 
-    def iterfaces(self, image):
+    def iterfaces(self, rgb):
         """Iterate over all detected faces"""
-        for face in self._faceDetector(image, self._upscale):
+        for face in self._faceDetector(rgb, self._upscale):
             yield face
 
     # landmarks detection
 
-    def _get_landmarks(self, image, face):
+    def _get_landmarks(self, rgb, face):
         """Return facial landmarks"""
-        points = self._landmarksDetector(image, face).parts()
+        points = self._landmarksDetector(rgb, face).parts()
         landmarks = np.float32([(p.x, p.y) for p in points])
         return landmarks
 
-    def landmarks(self, image, face):
-        return self._get_landmarks(image, face)
+    def landmarks(self, rgb, face):
+        return self._get_landmarks(rgb, face)
 
     # face normalization
 
@@ -141,7 +145,8 @@ class Face(object):
 
     def _affine(self, image, landmarks):
         H = cv2.getAffineTransform(
-            landmarks[EYES_AND_NOSE], self._landmarks[EYES_AND_NOSE])
+            landmarks[EYES_AND_BOTTOM_LIP],
+            self._landmarks[EYES_AND_BOTTOM_LIP])
         normalized = cv2.warpAffine(image, H, (self.size, self.size))
         return normalized
 
@@ -164,17 +169,17 @@ class Face(object):
         if self.normalization == 'homography':
             return self._homography(image, landmarks)
 
-    def normalize(self, image, face):
-        landmarks = self._get_landmarks(image, face)
-        return self._get_normalized(image, landmarks)
+    def normalize(self, rgb, face):
+        landmarks = self._get_landmarks(rgb, face)
+        return self._get_normalized(rgb, landmarks)
 
     # openface feature extraction
 
     def _get_openface(self, normalized):
         return self._net.forwardImage(normalized)
 
-    def openface(self, image, face):
-        normalized = self.normalize(image, face)
+    def openface(self, rgb, face):
+        normalized = self.normalize(rgb, face)
         return self._get_openface(normalized)
 
     # debugging
@@ -188,14 +193,14 @@ class Face(object):
         copy = cv2.resize(copy, (self.size, self.size))
         return copy
 
-    def __call__(self, image, return_landmarks=False, return_normalized=False,
+    def __call__(self, rgb, return_landmarks=False, return_normalized=False,
                  return_openface=False, return_debug=False):
         """Iterate over all faces
 
         Parameters
         ----------
-        image : np.array
-            Image to be processed
+        rgb : np.array
+            RGB image to be processed
         return_landmarks : bool
             Whether to yield landmarks. Defaults to False.
         return_normalized : bool
@@ -206,7 +211,7 @@ class Face(object):
             Whether to yield debugging image. Defaults to False.
         """
 
-        for face in self.iterfaces(image):
+        for face in self.iterfaces(rgb):
 
             _face = (face.left(), face.top(), face.right(), face.bottom())
 
@@ -220,11 +225,11 @@ class Face(object):
             result = (_face, )
 
             # compute landmarks
-            landmarks = self._get_landmarks(image, face)
+            landmarks = self._get_landmarks(rgb, face)
 
             # normalize face
             if (return_normalized or return_openface):
-                normalized = self._get_normalized(image, landmarks)
+                normalized = self._get_normalized(rgb, landmarks)
 
             # compute openface descriptor
             if return_openface:
@@ -232,7 +237,7 @@ class Face(object):
 
             # compute debugging image
             if return_debug:
-                debug = self.debug(image, face, landmarks)
+                debug = self.debug(rgb, face, landmarks)
 
             # append landmarks
             if return_landmarks:
