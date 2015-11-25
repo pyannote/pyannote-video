@@ -179,8 +179,9 @@ class Face(object):
         return self._net.forwardImage(normalized)
 
     def openface(self, rgb, face):
-        normalized = self.normalize(rgb, face)
-        return self._get_openface(normalized)
+        normalized_rgb = self.normalize(rgb, face)
+        normalized_bgr = cv2.cvtColor(normalized_rgb, cv2.COLOR_BGR2RGB)
+        return self._get_openface(normalized_bgr)
 
     # debugging
 
