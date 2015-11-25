@@ -425,18 +425,10 @@ def landmark(video, model, tracking, output, show_progress=False):
                     foutput.write(' {x:d} {y:d}'.format(x=x, y=y))
                 foutput.write('\n')
 
-def features(video, model, shape, output, show_progress=False):
+def features(video, model, shape, output):
     """Openface FaceNet feature extraction"""
 
     face = Face(size=96, normalization='affine', openface=model)
-
-    # frame generator
-    frames = video.iterframes(with_time=True)
-    if show_progress:
-        frames = tqdm(iterable=frames,
-                      total=video.duration * video.fps,
-                      leave=True, mininterval=1.,
-                      unit='frames', unit_scale=True)
 
     # shape generator
     shapeGenerator = getShapeGenerator(shape)
@@ -444,14 +436,15 @@ def features(video, model, shape, output, show_progress=False):
 
     with open(output, 'w') as foutput:
 
-        for timestamp, frame in frames:
+        for timestamp, rgb in video:
 
             T, shapes = shapeGenerator.send(timestamp)
 
             for identifier, landmarks in shapes:
-
-                normalized = face._get_normalized(frame, landmarks)
-                openface = face._get_openface(normalized)
+                normalized_rgb = face._get_normalized(rgb, landmarks)
+                normalized_bgr = cv2.cvtColor(normalized_rgb,
+                                              cv2.COLOR_BGR2RGB)
+                openface = face._get_openface(normalized_bgr)
 
                 foutput.write('{t:.3f} {identifier:d}'.format(
                     t=T, identifier=identifier))
@@ -573,6 +566,7 @@ if __name__ == '__main__':
         landmark(video, model, tracking, output,
               show_progress=verbose)
 
+    # openface features extraction
     if arguments['features']:
 
         model = arguments['<model>']
