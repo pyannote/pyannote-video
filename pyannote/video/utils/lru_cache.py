@@ -1,3 +1,6 @@
+# taken from http://code.activestate.com/recipes/
+# 578078-py26-and-py30-backport-of-python-33s-lru-cache
+
 from __future__ import absolute_import
 
 import functools
