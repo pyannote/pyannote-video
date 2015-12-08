@@ -34,7 +34,7 @@ face detection => (face tracking =>) landmarks detection => feature extraction
 
 Usage:
   pyannote-face detect [--verbose] [options] <video> <output>
-  pyannote-face track [--verbose] <video> <shot> <detection> <output>
+  pyannote-face track [--verbose] <video> <shot.json> <detection> <output>
   pyannote-face landmarks [--verbose] <video> <model> <tracking> <output>
   pyannote-face features [--verbose] <video> <model> <landmark> <output>
   pyannote-face demo [--from=<sec>] [--until=<sec>] <video> <tracking> <output>
@@ -60,6 +60,8 @@ MIN_OVERLAP_RATIO = 0.5
 MIN_CONFIDENCE = 10.
 
 from docopt import docopt
+
+import pyannote.core
 from pyannote.video import __version__
 from pyannote.video import Video
 from pyannote.video import Face
@@ -80,22 +82,23 @@ FACE_TEMPLATE = ('{t:.3f} {identifier:d} '
 def getShotGenerator(shotFile):
     """Parse precomputed shot file and generate boundary timestamps"""
 
+    from pyannote.core.json import load
+    shots = load(shotFile)
+
     t = yield
+    for segment in shots:
 
-    with open(shotFile, 'r') as f:
+        T = segment.end
 
-        for line in f:
-            T = float(line.strip())
+        while True:
+            # loop until a large enough t is sent to the generator
+            if T > t:
+                t = yield
+                continue
 
-            while True:
-                # loop until a large enough t is sent to the generator
-                if T > t:
-                    t = yield
-                    continue
-
-                # else, we found a new shot
-                t = yield T
-                break
+            # else, we found a new shot
+            t = yield T
+            break
 
 
 def getFaceGenerator(detection, double=True):
@@ -500,7 +503,7 @@ if __name__ == '__main__':
     # face tracking
     if arguments['track']:
 
-        shot = arguments['<shot>']
+        shot = arguments['<shot.json>']
         detection = arguments['<detection>']
         output = arguments['<output>']
         min_overlap_ratio = float(arguments['--min-overlap'])
