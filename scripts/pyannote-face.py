@@ -37,7 +37,7 @@ Usage:
   pyannote-face track [--verbose] <video> <shot.json> <detection> <output>
   pyannote-face landmarks [--verbose] <video> <model> <tracking> <output>
   pyannote-face features [--verbose] <video> <model> <landmark> <output>
-  pyannote-face demo [--from=<sec>] [--until=<sec>] <video> <tracking> <output>
+  pyannote-face demo [--from=<sec>] [--until=<sec>] [--shift=<sec>] [--label=<path>] <video> <tracking> <output>
   pyannote-face (-h | --help)
   pyannote-face --version
 
@@ -46,6 +46,8 @@ Options:
   --smallest=<size>         (Approximate) size of smallest face [default: 36].
   --from=<sec>              Encode demo from <sec> seconds [default: 0].
   --until=<sec>             Encode demo until <sec> seconds.
+  --shift=<sec>             Shift tracks by <sec> seconds [default: 0].
+  --label=<path>            Track labels.
   --min-overlap=<ratio>     Associates face with tracker if overlap is greater
                             than <ratio> [default: 0.5].
   --min-confidence=<float>  Reset trackers with confidence lower than <float>
@@ -414,7 +416,7 @@ def features(video, model, shape, output):
                 foutput.write('\n')
 
 
-def get_fl(tracking):
+def get_fl(tracking, shift=0., labels=dict()):
 
     COLORS = [
         (240, 163, 255), (  0, 117, 220), (153,  63,   0), ( 76,   0,  92),
@@ -432,7 +434,7 @@ def get_fl(tracking):
     def overlay(get_frame, timestamp):
         frame = get_frame(timestamp)
         height, width, _ = frame.shape
-        _, faces = faceGenerator.send(timestamp)
+        _, faces = faceGenerator.send(timestamp - shift)
 
         cv2.putText(frame, '{t:.3f}'.format(t=timestamp), (10, height-10),
                     cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1, 8, False)
@@ -446,29 +448,41 @@ def get_fl(tracking):
 
             # Print tracker identifier
             cv2.putText(frame, '#{identifier:d}'.format(identifier=identifier),
-                        (pt1[0] + 2, pt1[1] - 2), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, color, 1, 8, False)
+                        (pt1[0], pt2[1] + 15), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, (255, 0, 0), 1, 8, False)
 
-            # Print tracker confidence
+            # Print track label
+            label = labels.get(identifier, '')
             cv2.putText(frame,
-                        '{confidence:d}'.format(confidence=int(confidence)),
-                        (pt1[0] + 2, pt2[1] - 2), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, color, 1, 8, False)
+                        '{label:s}'.format(label=label),
+                        (pt1[0], pt1[1] - 7), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, (255, 0, 0), 1, 8, False)
         return frame
 
     return overlay
 
 
-def demo(filename, tracking, output, t_start=0, t_end=None):
+def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
+         labels=None):
 
     import os
     os.environ['IMAGEIO_FFMPEG_EXE'] = 'ffmpeg'
     from moviepy.video.io.VideoFileClip import VideoFileClip
 
+    if labels is not None:
+        with open(labels, 'r') as f:
+            labels = {}
+            for line in f:
+                identifier, label = line.strip().split()
+                identifier = int(identifier)
+                labels[identifier] = label
+
     original_clip = VideoFileClip(filename)
-    modified_clip = original_clip.fl(get_fl(tracking))
+    modified_clip = original_clip.fl(get_fl(tracking,
+                                            shift=shift,
+                                            labels=labels))
     cropped_clip = modified_clip.subclip(t_start=t_start, t_end=t_end)
-    cropped_clip.write_videofile(output, audio=False)
+    cropped_clip.write_videofile(output)
 
 
 if __name__ == '__main__':
@@ -537,4 +551,11 @@ if __name__ == '__main__':
         t_end = arguments['--until']
         t_end = float(t_end) if t_end else None
 
-        demo(filename, tracking, output, t_start=t_start, t_end=t_end)
+        shift = float(arguments['--shift'])
+        labels = arguments['--label']
+        if not labels:
+            labels = None
+
+        demo(filename, tracking, output,
+             t_start=t_start, t_end=t_end,
+             shift=shift, labels=labels)
