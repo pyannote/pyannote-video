@@ -26,6 +26,8 @@
 # AUTHORS
 # Hervé BREDIN - http://herve.niderb.fr
 
+"""Tracking by detection"""
+
 import itertools
 import numpy as np
 import networkx as nx
@@ -38,15 +40,18 @@ BACKWARD = 'backward'
 DETECTION = 'detection'
 ERROR = 'error'
 
+
 def get_face_detect(face):
+    """Create function for face detection"""
     def face_detect(frame):
+        """Detect face in frame"""
         for f in face.iterfaces(frame):
             yield (f.left(), f.top(), f.right(), f.bottom())
     return face_detect
 
 
 def get_segment_generator(segmentation):
-
+    """Time-driven segment generator"""
     t = yield
     for segment in segmentation:
         T = segment.end
@@ -62,13 +67,26 @@ def get_segment_generator(segmentation):
             break
 
 
-def get_min_max_t(nodes):
-    m = min(t for t, _, _ in nodes)
-    M = max(t for t, _, _ in nodes)
+def get_min_max_t(track):
+    """Get track stat and end times"""
+    m = min(t for t, _, _ in track)
+    M = max(t for t, _, _ in track)
     return (m, M)
 
 
 class TrackingByDetection(object):
+    """(Forward/backward) tracking by detection
+
+    Usage
+    -----
+    >>> from pyannote.video import Video, TrackingByDetection
+    >>> video = Video(path_to_video)
+    >>> # load segmentation into shots
+    >>> tracking = TrackingByDetection()
+    >>> for face_track in tracking(video, shots):
+    ...     # do something with face track
+    ...     pass
+    """
 
     def __init__(self, detect_func=None,
                  min_confidence=10., min_overlap_ratio=0.5):
@@ -86,16 +104,18 @@ class TrackingByDetection(object):
         self._hungarian = Munkres()
 
     def _reset(self):
+        """Reset tracking"""
         self._frame_cache = []
         self._tracking_graph = nx.DiGraph()
 
     def _kill_tracker(self, identifier):
+        """Kill specific tracker"""
         del self._trackers[identifier]
         del self._confidences[identifier]
         del self._previous[identifier]
 
     def _associate(self, trackers, detections):
-        """
+        """Associate trackers and detections with Hungarian algorithm
 
         Parameters
         ----------
@@ -109,7 +129,7 @@ class TrackingByDetection(object):
         -------
         match : dict
             Dictionary where values are trackers
-            and keys are matches detection indices.
+            and keys are matched detection indices.
         """
 
         n_trackers, n_detections = len(trackers), len(detections)
@@ -146,12 +166,13 @@ class TrackingByDetection(object):
             tracker_area = tracker.get_position().area()
 
             if ((area > detection_area * self.min_overlap_ratio) or
-               (area > tracker_area * self.min_overlap_ratio)):
+                (area > tracker_area * self.min_overlap_ratio)):
                 match[d] = identifier
 
         return match
 
     def _track(self, direction=FORWARD):
+        """Actual tracking based on existing detections"""
 
         if direction == FORWARD:
             frame_cache = self._frame_cache
@@ -227,7 +248,6 @@ class TrackingByDetection(object):
                 # increment tracker identifier
                 new_identifier = new_identifier + 1
 
-
     def _fix_track(self, track):
 
         fixed_track = []
@@ -243,7 +263,7 @@ class TrackingByDetection(object):
                 overlap = pos1.intersect(pos2).area()
 
                 if ((overlap < pos1.area() * self.min_overlap_ratio) or
-                    (overlap < pos2.area() * self.min_overlap_ratio)):
+                   (overlap < pos2.area() * self.min_overlap_ratio)):
                     error = True
                     break
 
@@ -260,7 +280,6 @@ class TrackingByDetection(object):
             fixed_track.append((t, pos, status))
 
         return fixed_track
-
 
     def _forward_backward(self):
 
@@ -285,6 +304,12 @@ class TrackingByDetection(object):
             yield self._fix_track(track)
 
     def __call__(self, video, segmentation):
+        """
+        Parameters
+        ----------
+        video : Video
+        segmentation :
+        """
 
         segment_generator = get_segment_generator(segmentation)
         segment_generator.send(None)
