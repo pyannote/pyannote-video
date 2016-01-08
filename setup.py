@@ -51,6 +51,7 @@ setup(
         'tqdm >= 2.0.0',
         'dlib >= 18.17.100',
         'munkres >= 1.0.7',
+        'moviepy >= 0.2.2.11'
     ],
 
     version=versioneer.get_version(),
