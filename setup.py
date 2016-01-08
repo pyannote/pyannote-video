@@ -41,7 +41,7 @@ setup(
     },
     include_package_data=True,
     scripts=[
-        "scripts/pyannote-shot.py",
+        "scripts/pyannote-structure.py",
         "scripts/pyannote-face.py"
     ],
     install_requires=[
