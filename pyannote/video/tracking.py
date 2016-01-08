@@ -91,13 +91,15 @@ class TrackingByDetection(object):
     ...     pass
     """
 
-    def __init__(self, detect_func, min_confidence=10., min_overlap_ratio=0.5):
+    def __init__(self, detect_func,
+                 min_confidence=10., min_overlap_ratio=0.5, max_gap=0.):
 
         super(TrackingByDetection, self).__init__()
 
         self.detect_func = detect_func
         self.min_confidence = min_confidence
         self.min_overlap_ratio = min_overlap_ratio
+        self.max_gap = max_gap
 
         self._hungarian = Munkres()
 
@@ -245,7 +247,8 @@ class TrackingByDetection(object):
                 # increment tracker identifier
                 new_identifier = new_identifier + 1
 
-    def _fix_track(self, track):
+    def _fix(self, track):
+        """Fix track by merging matching forward/backward tracklets"""
 
         fixed_track = []
         for t, group in itertools.groupby(sorted(track), key=lambda x: x[0]):
@@ -277,6 +280,38 @@ class TrackingByDetection(object):
 
         return fixed_track
 
+    def _fill_gaps(self, tracks):
+
+        # sort tracks by start and end timestamps
+        tracks = sorted(tracks, key=get_min_max_t)
+
+        # build graph where nodes are tracks and where matching tracks
+        # less than "max_gap" away are connected
+        graph = nx.Graph()
+        for i, j in itertools.combinations(xrange(len(tracks)), 2):
+            graph.add_node(i)
+            graph.add_node(j)
+
+            # only try to match tracks with a short gap between them
+            ti = tracks[i][-1][0]
+            tj = tracks[j][0][0]
+            if (tj < ti) or (tj - ti > self.max_gap):
+                continue
+
+            # match tracks whose last and first position match
+            rectangle1 = dlib.drectangle(*tracks[i][-1][1])
+            rectangle2 = dlib.drectangle(*tracks[j][0][1])
+            if self._match(rectangle1, rectangle2):
+                graph.add_edge(i, j)
+
+        # merge tracks that are in the same connected component
+        merged_tracks = []
+        for group in nx.connected_components(graph):
+            track = [item for t in sorted(group) for item in tracks[t]]
+            merged_tracks.append(track)
+
+        return merged_tracks
+
     def _forward_backward(self):
 
         # forward tracking
@@ -291,13 +326,19 @@ class TrackingByDetection(object):
 
         self._tracking_graph.remove_nodes_from(timestamps)
 
-        # tracks sorted by start and end timestamps
+        # tracks are connected components in tracking graph
         tracks = nx.connected_components(
             self._tracking_graph.to_undirected(reciprocal=False))
-        tracks = sorted(tracks, key=get_min_max_t)
 
-        for track in tracks:
-            yield self._fix_track(track)
+        # merge matching backward/forward tracks
+        tracks = [self._fix(track) for track in tracks]
+
+        # fill gaps
+        tracks = self._fill_gaps(tracks)
+
+        # sort tracks by start and end timestamps
+        for track in sorted(tracks, key=get_min_max_t):
+            yield track
 
     def __call__(self, video, segmentation):
         """

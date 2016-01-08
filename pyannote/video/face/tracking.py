@@ -46,7 +46,7 @@ class FaceTracking(TrackingByDetection):
     """
     """
     def __init__(self, smallest=SMALLEST_DEFAULT,
-                 min_confidence=10., min_overlap_ratio=0.5):
+                 min_confidence=10., min_overlap_ratio=0.5, max_gap=0.):
 
         face = Face(smallest=smallest)
         detect_func = get_face_detect(face)
@@ -54,4 +54,5 @@ class FaceTracking(TrackingByDetection):
         super(FaceTracking, self).__init__(
             detect_func=detect_func,
             min_confidence=min_confidence,
-            min_overlap_ratio=min_overlap_ratio)
+            min_overlap_ratio=min_overlap_ratio,
+            max_gap=max_gap)
