@@ -78,7 +78,7 @@ class TrackingByDetection(object):
         Do not associate trackers and detections if their overlap ratio goes
         below this value. Defaults to 0.5.
     max_gap : float, optional
-        Toto
+        Bridge gap with duration shorter than this
 
     Usage
     -----
