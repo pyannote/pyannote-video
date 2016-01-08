@@ -32,22 +32,12 @@ import itertools
 import numpy as np
 import networkx as nx
 from munkres import Munkres
-from pyannote.video.face.face import Face
 import dlib
 
 FORWARD = 'forward'
 BACKWARD = 'backward'
 DETECTION = 'detection'
 ERROR = 'error'
-
-
-def get_face_detect(face):
-    """Create function for face detection"""
-    def face_detect(frame):
-        """Detect face in frame"""
-        for f in face.iterfaces(frame):
-            yield (f.left(), f.top(), f.right(), f.bottom())
-    return face_detect
 
 
 def get_segment_generator(segmentation):
@@ -77,6 +67,17 @@ def get_min_max_t(track):
 class TrackingByDetection(object):
     """(Forward/backward) tracking by detection
 
+    Parameters
+    ----------
+    detect_func : func
+        Detection function. Should take video frame as input and return list
+        (or iterable) of detections as (left, top, right, bottom) tuples.
+    min_confidence : float, optional
+        Kill trackers whose confidence goes below this value. Defaults to 10.
+    min_overlap_ratio : float, optional
+        Do not associate trackers and detections if their overlap ratio goes
+        below this value. Defaults to 0.5.
+
     Usage
     -----
     >>> from pyannote.video import Video, TrackingByDetection
@@ -88,16 +89,11 @@ class TrackingByDetection(object):
     ...     pass
     """
 
-    def __init__(self, detect_func=None,
-                 min_confidence=10., min_overlap_ratio=0.5):
+    def __init__(self, detect_func, min_confidence=10., min_overlap_ratio=0.5):
 
         super(TrackingByDetection, self).__init__()
 
-        # defaults to face detection
-        if detect_func is None:
-            detect_func = get_face_detect(Face())
         self.detect_func = detect_func
-
         self.min_confidence = min_confidence
         self.min_overlap_ratio = min_overlap_ratio
 
@@ -317,7 +313,9 @@ class TrackingByDetection(object):
 
         for t, frame in video:
 
-            if segment_generator.send(t):
+            segment = segment_generator.send(t)
+
+            if segment:
 
                 # forward/backward tracking
                 for track in self._forward_backward():
