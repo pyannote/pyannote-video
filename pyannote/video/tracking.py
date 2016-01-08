@@ -156,9 +156,8 @@ class TrackingByDetection(object):
                 overlap_area[t, d] = self._match(position, rectangle)
 
         # find the best one-to-one mapping
-        mapping = self._hungarian.compute(np.max(overlap_area) - overlap_area)
         match = {}
-
+        mapping = self._hungarian.compute(np.max(overlap_area) - overlap_area)
         for t, d in mapping:
 
             if t >= n_trackers or d >= n_detections:
@@ -267,9 +266,13 @@ class TrackingByDetection(object):
                     break
 
             # status
-            status = "-".join(sorted(status for _, _, status in group))
+            status = "+".join(
+                sorted((status for _, _, status in group),
+                       key=lambda s: {DETECTION: 2,
+                                      FORWARD: 1,
+                                      BACKWARD: 3}[s]))
             if error:
-                status = "+".join([ERROR, status])
+                status = "error({0})".format(status)
 
             # average position
             pos = tuple(int(round(v))
