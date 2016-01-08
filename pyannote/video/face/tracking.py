@@ -26,7 +26,7 @@
 # AUTHORS
 # Hervé BREDIN - http://herve.niderb.fr
 
-"""Face tracking by detection"""
+"""Face tracking"""
 
 from .face import Face
 from .face import SMALLEST_DEFAULT
@@ -43,7 +43,20 @@ def get_face_detect(face):
 
 
 class FaceTracking(TrackingByDetection):
-    """
+    """Face tracking
+
+    Parameters
+    ----------
+    smallest : int, optional
+        Approximate size in pixel of the smallest face that should be
+        detected. Defaults to 36.
+    min_confidence : float, optional
+        Kill trackers whose confidence goes below this value. Defaults to 10.
+    min_overlap_ratio : float, optional
+        Do not associate trackers and detections if their overlap ratio goes
+        below this value. Defaults to 0.3.
+    max_gap : float, optional
+        Bridge gaps with duration shorter than this value.
     """
     def __init__(self, smallest=SMALLEST_DEFAULT,
                  min_confidence=10., min_overlap_ratio=0.3, max_gap=0.):
