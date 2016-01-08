@@ -77,6 +77,8 @@ class TrackingByDetection(object):
     min_overlap_ratio : float, optional
         Do not associate trackers and detections if their overlap ratio goes
         below this value. Defaults to 0.5.
+    max_gap : float, optional
+        Toto
 
     Usage
     -----
@@ -110,6 +112,13 @@ class TrackingByDetection(object):
         del self._confidences[identifier]
         del self._previous[identifier]
 
+    def _match(self, rectangle1, rectangle2):
+        overlap = rectangle1.intersect(rectangle2).area()
+        if ((overlap < self.min_overlap_ratio * rectangle1.area()) or
+            (overlap < self.min_overlap_ratio * rectangle2.area())):
+            overlap = 0.
+        return overlap
+
     def _associate(self, trackers, detections):
         """Associate trackers and detections with Hungarian algorithm
 
@@ -142,7 +151,7 @@ class TrackingByDetection(object):
             position = tracker.get_position()
             for d, detection in enumerate(detections):
                 rectangle = dlib.drectangle(*detection)
-                overlap_area[t, d] = position.intersect(rectangle).area()
+                overlap_area[t, d] = self._match(position, rectangle)
 
         # find the best one-to-one mapping
         mapping = self._hungarian.compute(np.max(overlap_area) - overlap_area)
@@ -153,16 +162,8 @@ class TrackingByDetection(object):
             if t >= n_trackers or d >= n_detections:
                 continue
 
-            area = overlap_area[t, d]
-
-            detection = dlib.drectangle(*detections[d])
-            detection_area = detection.area()
-
-            identifier, tracker = trackers_[t]
-            tracker_area = tracker.get_position().area()
-
-            if ((area > detection_area * self.min_overlap_ratio) or
-                (area > tracker_area * self.min_overlap_ratio)):
+            if overlap_area[t, d] > 0.:
+                identifier, _ = trackers_[t]
                 match[d] = identifier
 
         return match
@@ -254,12 +255,11 @@ class TrackingByDetection(object):
             # make sure all positions are overlap enough
             error = False
             for (_, pos1, _), (_, pos2, _) in itertools.combinations(group, 2):
-                pos1 = dlib.drectangle(*pos1)
-                pos2 = dlib.drectangle(*pos2)
-                overlap = pos1.intersect(pos2).area()
 
-                if ((overlap < pos1.area() * self.min_overlap_ratio) or
-                   (overlap < pos2.area() * self.min_overlap_ratio)):
+                rectangle1 = dlib.drectangle(*pos1)
+                rectangle2 = dlib.drectangle(*pos2)
+
+                if self._match(rectangle1, rectangle2) == 0:
                     error = True
                     break
 
