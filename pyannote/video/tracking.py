@@ -76,7 +76,7 @@ class TrackingByDetection(object):
         Kill trackers whose confidence goes below this value. Defaults to 10.
     min_overlap_ratio : float, optional
         Do not associate trackers and detections if their overlap ratio goes
-        below this value. Defaults to 0.5.
+        below this value. Defaults to 0.3.
     max_gap : float, optional
         Bridge gap with duration shorter than this
 
@@ -92,7 +92,7 @@ class TrackingByDetection(object):
     """
 
     def __init__(self, detect_func,
-                 min_confidence=10., min_overlap_ratio=0.5, max_gap=0.):
+                 min_confidence=10., min_overlap_ratio=0.3, max_gap=0.):
 
         super(TrackingByDetection, self).__init__()
 
