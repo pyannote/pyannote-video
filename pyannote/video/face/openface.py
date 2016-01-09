@@ -30,7 +30,7 @@ class TorchWrap(object):
     #   https://github.com/cmusatyalab/openface/issues/4
 
     def __init__(self, torch='/root/torch/install/bin/th',
-                 model='nn4.v1.t7', size=96, cuda=False):
+                 model='nn4.v2.t7', size=96, cuda=False):
 
         super(TorchWrap, self).__init__()
 
@@ -102,10 +102,10 @@ stderr: {}
 """.format(output, str(e), stdout, stderr))
             sys.exit(-1)
 
-    def forwardImage(self, rgb):
+    def forwardImage(self, bgr):
         t = '/tmp/openface-torchwrap-{}.png'.format(
             binascii.b2a_hex(os.urandom(8)))
-        cv2.imwrite(t, rgb)
+        cv2.imwrite(t, bgr)
         rep = np.array(self.forwardPath(t))
         os.remove(t)
         return rep

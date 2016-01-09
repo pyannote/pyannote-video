@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 
-# Copyright (c) 2015 CNRS
+# Copyright (c) 2015-2016 CNRS
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -75,15 +75,12 @@ TEMPLATE = np.float32([
 TPL_MIN, TPL_MAX = np.min(TEMPLATE, axis=0), np.max(TEMPLATE, axis=0)
 MINMAX_TEMPLATE = (TEMPLATE - TPL_MIN) / (TPL_MAX - TPL_MIN)
 
-EYES_AND_BOTTOM_LIP = np.array([39, 42, 57])
-EYES_AND_NOSE = np.array([39, 42, 33])
-EYES_AND_MOUTH = np.array([39, 42, 48, 54])
-
+OUTER_EYES_AND_NOSE = np.array([36, 45, 33])
 
 class Face(object):
     """Face processing"""
     def __init__(self, landmarks=None, smallest=SMALLEST_DEFAULT,
-                 normalization='affine', openface=None, size=96):
+                 openface=None, size=96):
         """Face detection
 
         Parameters
@@ -95,8 +92,6 @@ class Face(object):
             detected.
         size : int
             Size of the normalized face thumbnail.
-        normalization : {'affine', 'perspective', 'homography'}
-            Normalization.
         openface : str
             Path to openface FaceNet model.
         """
@@ -116,7 +111,6 @@ class Face(object):
         # normalization
         self.size = size
         self._landmarks = MINMAX_TEMPLATE * self.size
-        self.normalization = normalization
 
         if openface is not None:
             self._net = TorchWrap(model=openface, size=self.size, cuda=False)
@@ -142,40 +136,13 @@ class Face(object):
 
     # face normalization
 
-    def _homography(self, rgb, landmarks):
-        """(internal) homographic normalization based on all landmarks"""
-        matrix, _ = cv2.findHomography(landmarks, self._landmarks)
-        normalized = cv2.warpPerspective(rgb, matrix, (self.size, self.size))
-        return normalized
-
-    def _affine(self, rgb, landmarks):
-        """(internal) affine normalization based on eyes and bottom lip"""
+    def _get_normalized(self, rgb, landmarks):
+        """Return normalized face based on outer eyes and nose tip"""
         matrix = cv2.getAffineTransform(
-            landmarks[EYES_AND_BOTTOM_LIP],
-            self._landmarks[EYES_AND_BOTTOM_LIP])
+            landmarks[OUTER_EYES_AND_NOSE],
+            self._landmarks[OUTER_EYES_AND_NOSE])
         normalized = cv2.warpAffine(rgb, matrix, (self.size, self.size))
         return normalized
-
-    def _perspective(self, rgb, landmarks):
-        """(internal) perspective normalization
-        based on eyes and mouth corners"""
-        matrix = cv2.getPerspectiveTransform(
-            landmarks[EYES_AND_MOUTH],
-            self._landmarks[EYES_AND_MOUTH])
-        normalized = cv2.warpPerspective(rgb, matrix, (self.size, self.size))
-        return normalized
-
-    def _get_normalized(self, rgb, landmarks):
-        """Return normalized face"""
-
-        if self.normalization == 'affine':
-            return self._affine(rgb, landmarks)
-
-        if self.normalization == 'perspective':
-            return self._perspective(rgb, landmarks)
-
-        if self.normalization == 'homography':
-            return self._homography(rgb, landmarks)
 
     def normalize(self, rgb, face):
         """Return normalized face"""
