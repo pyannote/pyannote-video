@@ -31,6 +31,14 @@ __version__ = get_versions()['version']
 del get_versions
 
 from .video import Video
-from .face.face import Face
 
-__all__ = ['Video', 'Face']
+# video editing structure
+from .structure.shot import Shot
+from .structure.thread import Thread
+
+# face processing
+from .face.face import Face
+from .face.tracking import FaceTracking
+
+
+__all__ = ['Video', 'Shot', 'Thread', 'Face', 'FaceTracking']
