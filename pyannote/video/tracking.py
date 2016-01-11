@@ -103,11 +103,6 @@ class TrackingByDetection(object):
 
         self._hungarian = Munkres()
 
-    def _reset(self):
-        """Reset tracking"""
-        self._frame_cache = []
-        self._tracking_graph = nx.DiGraph()
-
     def _kill_tracker(self, identifier):
         """Kill specific tracker"""
         del self._trackers[identifier]
@@ -343,6 +338,11 @@ class TrackingByDetection(object):
         # sort tracks by start and end timestamps
         for track in sorted(tracks, key=get_min_max_t):
             yield track
+
+    def _reset(self):
+        """Reset tracking"""
+        self._frame_cache = []
+        self._tracking_graph = nx.DiGraph()
 
     def __call__(self, video, segmentation):
         """
