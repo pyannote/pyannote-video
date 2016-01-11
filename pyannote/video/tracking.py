@@ -291,9 +291,10 @@ class TrackingByDetection(object):
         # build graph where nodes are tracks and where matching tracks
         # less than "max_gap" away are connected
         graph = nx.Graph()
-        for i, j in itertools.combinations(xrange(len(tracks)), 2):
+        for i in xrange(len(tracks)):
             graph.add_node(i)
-            graph.add_node(j)
+
+        for i, j in itertools.combinations(xrange(len(tracks)), 2):
 
             # only try to match tracks with a short gap between them
             ti = tracks[i][-1][0]
