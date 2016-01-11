@@ -33,8 +33,7 @@ The standard pipeline is the following (with optional face tracking)
 face detection => (face tracking =>) landmarks detection => feature extraction
 
 Usage:
-  pyannote-face detect [--verbose] [options] <video> <output>
-  pyannote-face track [--verbose] <video> <shot.json> <detection> <output>
+  pyannote-face track [options] [--verbose] <video> <shot.json> <output>
   pyannote-face landmarks [--verbose] <video> <model> <tracking> <output>
   pyannote-face features [--verbose] <video> <model> <landmark> <output>
   pyannote-face demo [--from=<sec>] [--until=<sec>] [--shift=<sec>] [--label=<path>] <video> <tracking> <output>
@@ -42,118 +41,99 @@ Usage:
   pyannote-face --version
 
 Options:
-  --every=<msec>            Process one frame every <msec> milliseconds.
   --smallest=<size>         (Approximate) size of smallest face [default: 36].
-  --from=<sec>              Encode demo from <sec> seconds [default: 0].
-  --until=<sec>             Encode demo until <sec> seconds.
-  --shift=<sec>             Shift tracks by <sec> seconds [default: 0].
-  --label=<path>            Track labels.
   --min-overlap=<ratio>     Associates face with tracker if overlap is greater
                             than <ratio> [default: 0.5].
   --min-confidence=<float>  Reset trackers with confidence lower than <float>
                             [default: 10.].
+  --max-gap=<float>         Bridge gaps with duration shorter than <float>
+                            [default: 1.].
+  --from=<sec>              Encode demo from <sec> seconds [default: 0].
+  --until=<sec>             Encode demo until <sec> seconds.
+  --shift=<sec>             Shift tracks by <sec> seconds [default: 0].
+  --label=<path>            Track labels.
   -h --help                 Show this screen.
   --version                 Show version.
   --verbose                 Show progress.
 """
 
-SMALLEST_DEFAULT = 36
-MIN_OVERLAP_RATIO = 0.5
-MIN_CONFIDENCE = 10.
-
 from docopt import docopt
 
-import pyannote.core
+from pyannote.core.json import load
 from pyannote.video import __version__
 from pyannote.video import Video
 from pyannote.video import Face
+from pyannote.video import FaceTracking
+
+from pandas import read_table
 
 from six.moves import zip
-from munkres import Munkres
 import numpy as np
 import cv2
 
 import dlib
 
 
+SMALLEST_DEFAULT = 36
+MIN_OVERLAP_RATIO = 0.5
+MIN_CONFIDENCE = 10.
+MAX_GAP = 1.
+
 FACE_TEMPLATE = ('{t:.3f} {identifier:d} '
                  '{left:d} {top:d} {right:d} {bottom:d} '
-                 '{confidence:.3f}\n')
+                 '{status:s}\n')
 
 
-def getShotGenerator(shotFile):
-    """Parse precomputed shot file and generate boundary timestamps"""
-
-    from pyannote.core.json import load
-    shots = load(shotFile)
-
-    t = yield
-    for segment in shots:
-
-        T = segment.end
-
-        while True:
-            # loop until a large enough t is sent to the generator
-            if T > t:
-                t = yield
-                continue
-
-            # else, we found a new shot
-            t = yield T
-            break
-
-
-def getFaceGenerator(detection, double=True):
+def getFaceGenerator(tracking, double=True):
     """Parse precomputed face file and generate timestamped faces"""
+
+    # load tracking file and sort it by timestamp
+    names = ['t', 'track', 'left', 'top', 'right', 'bottom', 'status']
+    dtype = {'left': np.int32, 'top': np.int32,
+             'right': np.int32, 'bottom': np.int32}
+    tracking = read_table(tracking, delim_whitespace=True, header=None,
+                          names=names, dtype=dtype)
+    tracking = tracking.sort_values('t')
 
     # t is the time sent by the frame generator
     t = yield
 
     rectangle = dlib.drectangle if double else dlib.rectangle
 
-    with open(detection, 'r') as f:
+    faces = []
+    currentT = None
 
-        faces = []
-        currentT = None
+    for _, (T, identifier, left, top, right, bottom, status) in tracking.iterrows():
 
-        for line in f:
+        face = rectangle(left, top, right, bottom)
 
-            # parse line
-            # time, identifier, left, top, right, bottom, confidence
-            tokens = line.strip().split()
-            T = float(tokens[0])
-            identifier = int(tokens[1])
-            face = rectangle(*[int(token) for token in tokens[2:6]])
-            confidence = float(tokens[6])
+        # load all faces from current frame and only those faces
+        if T == currentT or currentT is None:
+            faces.append((identifier, face, status))
+            currentT = T
+            continue
 
-            # load all faces from current frame
-            # and only those faces
-            if T == currentT or currentT is None:
-                faces.append((identifier, face, confidence))
-                currentT = T
-                continue
-
-            # once all faces at current time are loaded
-            # wait until t reaches current time
-            # then returns all faces at once
-
-            while True:
-
-                # wait...
-                if currentT > t:
-                    t = yield t, []
-                    continue
-
-                # return all faces at once
-                t = yield currentT, faces
-
-                # reset current time and corresponding faces
-                faces = [(identifier, face, confidence)]
-                currentT = T
-                break
+        # once all faces at current time are loaded
+        # wait until t reaches current time
+        # then returns all faces at once
 
         while True:
-            t = yield t, []
+
+            # wait...
+            if currentT > t:
+                t = yield t, []
+                continue
+
+            # return all faces at once
+            t = yield currentT, faces
+
+            # reset current time and corresponding faces
+            faces = [(identifier, face, status)]
+            currentT = T
+            break
+
+    while True:
+        t = yield t, []
 
 
 def pairwise(iterable):
@@ -165,200 +145,79 @@ def pairwise(iterable):
 def getShapeGenerator(shape):
     """Parse precomputed shape file and generate timestamped shapes"""
 
+    # load landmarks file
+    shape = read_table(shape, delim_whitespace=True, header=None)
+
+    # deduce number of landmarks from file dimension
+    _, d = shape.shape
+    n_points = (d - 2) / 2
+
     # t is the time sent by the frame generator
     t = yield
 
-    with open(shape, 'r') as f:
+    shapes = []
+    currentT = None
 
-        shapes = []
-        currentT = None
+    for _, row in shape.iterrows():
 
-        for line in f:
+        T = float(row[0])
+        identifier = int(row[1])
+        landmarks = np.float32(list(pairwise(
+            [int(coordinate) for coordinate in row[2:]])))
 
-            # parse line
-            # time, identifier, x1, y1, ..., x68, y68
-            tokens = line.strip().split()
-            T = float(tokens[0])
-            identifier = int(tokens[1])
-            landmarks = np.float32(list(pairwise(
-                [int(token) for token in tokens[2:]])))
+        # load all shapes from current frame
+        # and only those shapes
+        if T == currentT or currentT is None:
+            shapes.append((identifier, landmarks))
+            currentT = T
+            continue
 
-            # load all shapes from current frame
-            # and only those shapes
-            if T == currentT or currentT is None:
-                shapes.append((identifier, landmarks))
-                currentT = T
-                continue
-
-            # once all shapes at current time are loaded
-            # wait until t reaches current time
-            # then returns all shapes at once
-
-            while True:
-
-                # wait...
-                if currentT > t:
-                    t = yield t, []
-                    continue
-
-                # return all shapes at once
-                t = yield currentT, shapes
-
-                # reset current time and corresponding shapes
-                shapes = [(identifier, landmarks)]
-                currentT = T
-                break
+        # once all shapes at current time are loaded
+        # wait until t reaches current time
+        # then returns all shapes at once
 
         while True:
-            t = yield t, []
+
+            # wait...
+            if currentT > t:
+                t = yield t, []
+                continue
+
+            # return all shapes at once
+            t = yield currentT, shapes
+
+            # reset current time and corresponding shapes
+            shapes = [(identifier, landmarks)]
+            currentT = T
+            break
+
+    while True:
+        t = yield t, []
 
 
-def detect(video, output, smallest=36):
-    """Face detection"""
-
-    # face detector
-    # faceDetector = dlib.get_frontal_face_detector()
-    face = Face(smallest=smallest)
-
-    identifier = 0
-
-    with open(output, 'w') as foutput:
-
-        for t, rgb in video:
-
-            for boundingBox in face.iterfaces(rgb):
-
-                foutput.write(FACE_TEMPLATE.format(
-                    t=t, identifier=identifier, confidence=0.000,
-                    left=boundingBox.left(), right=boundingBox.right(),
-                    top=boundingBox.top(), bottom=boundingBox.bottom()))
-
-                identifier = identifier + 1
-
-
-def track(video, shot, detection, output,
-          min_overlap_ratio=MIN_OVERLAP_RATIO,
-          min_confidence=MIN_CONFIDENCE):
+def track(video, shot, output, smallest=36,
+          min_overlap_ratio=MIN_OVERLAP_RATIO, min_confidence=MIN_CONFIDENCE,
+          max_gap=MAX_GAP):
     """Tracking by detection"""
 
-    # shot generator
-    shotGenerator = getShotGenerator(shot)
-    shotGenerator.send(None)
+    tracking = FaceTracking(smallest=smallest,
+                            min_overlap_ratio=min_overlap_ratio,
+                            min_confidence=min_confidence,
+                            max_gap=max_gap)
 
-    # face generator
-    faceGenerator = getFaceGenerator(detection, double=True)
-    faceGenerator.send(None)
-
-    # Hungarian algorithm for face/tracker matching
-    hungarian = Munkres()
-
-    trackers = dict()
-    confidences = dict()
-    identifier = 0
+    shot = load(shot)
 
     with open(output, 'w') as foutput:
 
-        for timestamp, rgb in video:
+        for identifier, track in enumerate(tracking(video, shot)):
 
-            shot = shotGenerator.send(timestamp)
-
-            # reset trackers at shot boundaries
-            if shot:
-                trackers.clear()
-                confidences.clear()
-
-            # get all detected faces at this time
-            T, faces = faceGenerator.send(timestamp)
-            # not that T might be differ slightly from t
-            # due to different steps in frame iteration
-
-            # update all trackers and store their confidence
-            for i, tracker in trackers.items():
-                confidences[i] = tracker.update(rgb)
-
-            # reset trackers when it looses confidence
-            for i, tracker in list(trackers.items()):
-                if confidences[i] < min_confidence:
-                    del trackers[i]
-                    del confidences[i]
-
-            # set of (yet) un-associated trackers
-            unmatched = set(trackers)
-
-            Nt, Nf = len(trackers), len(faces)
-            if Nt and Nf:
-
-                # compute intersection for every tracker/face pair
-                N = max(Nt, Nf)
-                areas = np.zeros((N, N))
-                trackers_ = trackers.items()
-                for t, (i, tracker) in enumerate(trackers_):
-                    position = tracker.get_position()
-                    for f, (_, face, _) in enumerate(faces):
-                        areas[t, f] = position.intersect(face).area()
-
-                # find the best one-to-one mapping
-                mapping = hungarian.compute(np.max(areas) - areas)
-
-                for t, f in mapping:
-
-                    if t >= Nt or f >= Nf:
-                        continue
-
-                    area = areas[t, f]
-
-                    _, face, _ = faces[f]
-                    faceArea = face.area()
-
-                    i, tracker = trackers_[t]
-                    trackerArea = tracker.get_position().area()
-
-                    # if enough overlap,
-                    # re-intialize tracker and mark face as matched
-                    if ((area > faceArea * min_overlap_ratio) or
-                        (area > trackerArea * min_overlap_ratio)):
-                        tracker.start_track(rgb, face)
-                        unmatched.remove(i)
-
-                        foutput.write(FACE_TEMPLATE.format(
-                            t=T, identifier=i, confidence=confidences[i],
-                            left=int(face.left()), right=int(face.right()),
-                            top=int(face.top()), bottom=int(face.bottom())))
-
-                        faces[f] = None, None, None
-
-            for _, face, _ in faces:
-
-                # this face was matched already
-                if face is None:
-                    continue
-
-                # new tracker
-                tracker = dlib.correlation_tracker()
-                tracker.start_track(rgb, face)
-                confidences[identifier] = tracker.update(rgb)
-                trackers[identifier] = tracker
+            for t, (left, top, right, bottom), status in track:
 
                 foutput.write(FACE_TEMPLATE.format(
-                    t=T, identifier=identifier,
-                    confidence=confidences[identifier],
-                    left=int(face.left()), right=int(face.right()),
-                    top=int(face.top()), bottom=int(face.bottom())))
+                    t=t, identifier=identifier, status=status,
+                    left=left, right=right, top=top, bottom=bottom))
 
-                identifier = identifier + 1
-
-            for i, tracker in trackers.items():
-
-                if i not in unmatched:
-                    continue
-
-                face = tracker.get_position()
-
-                foutput.write(FACE_TEMPLATE.format(
-                    t=T, identifier=i, confidence=confidences[i],
-                    left=int(face.left()), right=int(face.right()),
-                    top=int(face.top()), bottom=int(face.bottom())))
-
+            foutput.flush()
 
 def landmark(video, model, tracking, output):
     """Facial features detection"""
@@ -388,10 +247,12 @@ def landmark(video, model, tracking, output):
                     foutput.write(' {x:d} {y:d}'.format(x=int(x), y=int(y)))
                 foutput.write('\n')
 
+            foutput.flush()
+
 def features(video, model, shape, output):
     """Openface FaceNet feature extraction"""
 
-    face = Face(size=96, normalization='affine', openface=model)
+    face = Face(size=96, openface=model)
 
     # shape generator
     shapeGenerator = getShapeGenerator(shape)
@@ -415,8 +276,9 @@ def features(video, model, shape, output):
                     foutput.write(' {x:.5f}'.format(x=x))
                 foutput.write('\n')
 
+            foutput.flush()
 
-def get_fl(tracking, shift=0., labels=dict()):
+def get_fl(tracking, shift=0., labels=None):
 
     COLORS = [
         (240, 163, 255), (  0, 117, 220), (153,  63,   0), ( 76,   0,  92),
@@ -431,6 +293,9 @@ def get_fl(tracking, shift=0., labels=dict()):
     faceGenerator = getFaceGenerator(tracking, double=True)
     faceGenerator.send(None)
 
+    if labels is None:
+        labels = dict()
+
     def overlay(get_frame, timestamp):
         frame = get_frame(timestamp)
         height, width, _ = frame.shape
@@ -438,7 +303,7 @@ def get_fl(tracking, shift=0., labels=dict()):
 
         cv2.putText(frame, '{t:.3f}'.format(t=timestamp), (10, height-10),
                     cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1, 8, False)
-        for identifier, face, confidence in faces:
+        for identifier, face, _ in faces:
             color = COLORS[identifier % len(COLORS)]
 
             # Draw face bounding box
@@ -495,36 +360,21 @@ if __name__ == '__main__':
     filename = arguments['<video>']
 
     verbose = arguments['--verbose']
-    # every xxx milliseconds
-    every = arguments['--every']
-    if not every:
-        step = None
-    else:
-        step = 1e-3 * float(arguments['--every'])
 
-    video = Video(filename, step=step, verbose=verbose)
-
-    # face detection
-    if arguments['detect']:
-
-        # (approximate) size of smallest face
-        smallest = int(arguments['--smallest'])
-
-        output = arguments['<output>']
-
-        detect(video, output, smallest=smallest)
+    video = Video(filename, verbose=verbose)
 
     # face tracking
     if arguments['track']:
 
         shot = arguments['<shot.json>']
-        detection = arguments['<detection>']
         output = arguments['<output>']
         min_overlap_ratio = float(arguments['--min-overlap'])
         min_confidence = float(arguments['--min-confidence'])
-        track(video, shot, detection, output,
+        max_gap = float(arguments['--max-gap'])
+        track(video, shot, output,
               min_overlap_ratio=min_overlap_ratio,
-              min_confidence=min_confidence)
+              min_confidence=min_confidence,
+              max_gap=max_gap)
 
     # facial features detection
     if arguments['landmarks']:
