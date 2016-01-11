@@ -59,7 +59,9 @@ Options:
 
 from docopt import docopt
 
+from pyannote.core import Annotation
 from pyannote.core.json import load
+
 from pyannote.video import __version__
 from pyannote.video import Video
 from pyannote.video import Face
@@ -206,6 +208,9 @@ def track(video, shot, output, smallest=36,
                             max_gap=max_gap)
 
     shot = load(shot)
+
+    if isinstance(shot, Annotation):
+        shot = shot.get_timeline()
 
     with open(output, 'w') as foutput:
 
