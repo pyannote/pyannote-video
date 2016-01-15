@@ -26,50 +26,7 @@
 # AUTHORS
 # Hervé BREDIN - http://herve.niderb.fr
 
+from .shot import Shot
+from .thread import Thread
 
-from setuptools import setup, find_packages
-import versioneer
-
-setup(
-
-    # package
-    namespace_packages=['pyannote'],
-    packages=find_packages(),
-    package_data={
-        'pyannote.video': [
-        ]
-    },
-    include_package_data=True,
-    scripts=[
-        "scripts/pyannote-structure.py",
-        "scripts/pyannote-face.py"
-    ],
-    install_requires=[
-        'pyannote.core >= 0.4.4',
-        'numpy >= 1.8',
-        'docopt >= 0.6.2',
-        'tqdm >= 2.0.0',
-        'dlib >= 18.17.100',
-        'munkres >= 1.0.7',
-        'moviepy >= 0.2.2.11'
-    ],
-
-    version=versioneer.get_version(),
-    cmdclass=versioneer.get_cmdclass(),
-
-    # PyPI
-    name='pyannote.video',
-    description=('PyAnnote video processing'),
-    author='Hervé Bredin',
-    author_email='bredin@limsi.fr',
-    url='http://herve.niderb.fr/',
-    classifiers=[
-        "Development Status :: 4 - Beta",
-        "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: MIT License",
-        "Natural Language :: English",
-        "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 3.5",
-        "Topic :: Scientific/Engineering"
-    ],
-)
+__all__ = ['Shot', 'Thread']

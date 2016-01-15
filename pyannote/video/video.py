@@ -4,7 +4,7 @@
 # The MIT License (MIT)
 #
 # Copyright (c) 2015 Zulko
-# Copyright (c) 2015 CNRS
+# Copyright (c) 2015-2016 CNRS
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -37,6 +37,8 @@ import re
 import warnings
 import logging
 import numpy as np
+from collections import deque
+from tqdm import tqdm
 
 logging.captureWarnings(True)
 
@@ -90,30 +92,57 @@ def _cvsecs(time):
 
 class Video:
 
-    def __init__(self, filename, ffmpeg='ffmpeg', debug=False):
+    def __init__(self, filename, start=None, end=None, step=None,
+                 ffmpeg='ffmpeg', verbose=False):
+        """
+        Parameters
+        ----------
+        start : float, optional
+            Begin iterating frames at time `start` (in seconds).
+            Defaults to 0.
+        end : float, optional
+            Stop iterating frames at time `end` (in seconds).
+            Defaults to video duration.
+        step : float, optional
+            Iterate frames every `step` seconds.
+            Defaults to iterating every frame.
+        verbose : bool, optional
+            Show a progress bar while iterating the video. Defaults to False.
+        ffmpeg : str, optional
+            Path to ffmpeg command line tool. Defaults to "ffmpeg".
+        """
 
         self.filename = filename
         self.ffmpeg = ffmpeg
-        infos = self._parse_infos(print_infos=debug, check_duration=True)
-        self.fps = infos['video_fps']
-        self.size = infos['video_size']
-        self.duration = infos['video_duration']
-        self.ffmpeg_duration = infos['duration']
-        self.nframes = infos['video_nframes']
+        self.verbose = verbose
 
-        self.infos = infos
+        infos = self._parse_infos(print_infos=False, check_duration=True)
+        self._fps = infos['video_fps']
+        self._size = infos['video_size']
+        self._duration = infos['video_duration']
+        # self.ffmpeg_duration = infos['duration']
+        self._nframes = infos['video_nframes']
 
-        self.pix_fmt = 'rgb24'
-        self.depth = 3
+        self.start = 0. if start is None else start
+        self.end = self._duration if end is None else end
+        self.step = 1./self._fps if step is None else step
 
-        w, h = self.size
-        bufsize = self.depth * w * h + 100
+        # TODO warning if step != N x 1/fps (where N is an integer)
+        # warnings.warn(message, UserWarning)
 
-        self.bufsize = bufsize
+        # self.infos = infos
+
+        self._pix_fmt = 'rgb24'
+        self._depth = 3
+
+        w, h = self._size
+        bufsize = self._depth * w * h + 100
+
+        self._bufsize = bufsize
         self._initialize()
 
-        self.pos = 1
-        self.lastread = self._read_frame()
+        self._pos = 1
+        self._lastread = self._read_frame()
 
     def _parse_infos(self, print_infos=False, check_duration=True):
         """Get file infos using ffmpeg.
@@ -274,9 +303,9 @@ class Video:
         cmd = (
             [self.ffmpeg] + i_arg +
             ['-loglevel', 'error', '-f', 'image2pipe',
-             '-pix_fmt', self.pix_fmt, '-vcodec', 'rawvideo', '-'])
+             '-pix_fmt', self._pix_fmt, '-vcodec', 'rawvideo', '-'])
 
-        popen_params = {"bufsize": self.bufsize,
+        popen_params = {"bufsize": self._bufsize,
                         "stdout": sp.PIPE,
                         "stderr": sp.PIPE,
                         "stdin": DEVNULL}
@@ -284,21 +313,21 @@ class Video:
         if os.name == "nt":
             popen_params["creationflags"] = 0x08000000
 
-        self.proc = sp.Popen(cmd, **popen_params)
+        self._proc = sp.Popen(cmd, **popen_params)
 
     def _skip_frames(self, n=1):
         """Reads and throws away n frames """
-        w, h = self.size
+        w, h = self._size
         for _ in range(n):
-            self.proc.stdout.read(self.depth*w*h)
-            # self.proc.stdout.flush()
-        self.pos += n
+            self._proc.stdout.read(self._depth*w*h)
+            # self._proc.stdout.flush()
+        self._pos += n
 
     def _read_frame(self):
-        w, h = self.size
-        nbytes = self.depth*w*h
+        w, h = self._size
+        nbytes = self._depth*w*h
 
-        s = self.proc.stdout.read(nbytes)
+        s = self._proc.stdout.read(nbytes)
 
         if len(s) != nbytes:
 
@@ -306,8 +335,8 @@ class Video:
                 "Warning: in file %s, " % (self.filename) +
                 "%d bytes wanted but %d bytes read," % (nbytes, len(s)) +
                 "at frame %d/%d, at time %.02f/%.02f sec. " % (
-                    self.pos, self.nframes, 1.0 * self.pos / self.fps,
-                    self.duration) +
+                    self._pos, self._nframes, 1.0 * self._pos / self._fps,
+                    self._duration) +
                 "Using the last valid frame instead.",
                 UserWarning)
 
@@ -322,41 +351,74 @@ class Video:
                 )
                 raise IOError(message % self.filename)
 
-            result = self.lastread
+            result = self._lastread
 
         else:
 
             result = np.fromstring(s, dtype='uint8')
             # reshape((h, w, len(s)//(w*h)))
             result.shape = (h, w, len(s)//(w*h))
-            self.lastread = result
+            self._lastread = result
 
         return result
 
-    def iterframes(self, start=None, end=None, step=None, with_time=False):
+    def __iter__(self):
+        return self.iterframes(with_time=True)
 
-        # default: starts from the beginning
-        if start is None:
-            start = 0.
+    def iterframes(self, with_time=False, with_context=False, context=1):
+        """Iterate over video frames
 
-        # default: iterates until the end
-        if end is None:
-            end = self.duration
+        Frames are generated as H x W x 3 numpy array in RGB order (not BGR).
+        (FYI, OpenCV standard format is BGR, not RGB).
 
-        # default: frame by frame
-        if step is None:
-            step = 1./self.fps
+        Parameters
+        ----------
+        with_time : boolean
+            When True, yields (time, frame).
+        with_context : {False, 'left', 'right', 'center'}
+            Defaults to False.
+        context : int
+            Number of contextual frames. Defaults to 1.
+        """
 
-        # TODO warning if step != N x 1/fps (where N is an integer)
-        # warnings.warn(message, UserWarning)
+        # initialize buffer of contextual frames
+        if with_context:
+            frames = deque([], context)
+            timestamps = deque([], context)
 
-        for t in np.arange(start, end, step):
-            frame = self._get_frame(t)
+        generator = np.arange(self.start, self.end, self.step)
+        if self.verbose:
+            generator = tqdm(iterable=generator,
+                             total=(self.end - self.start) / self.step,
+                             leave=True, mininterval=1.,
+                             unit='frames', unit_scale=True)
+
+        for t in generator:
+
+            rgb = self._get_frame(t)
+
+            # fill buffer of contextual frames
+            if with_context:
+                frames.append(rgb)
+                timestamps.append(t)
+                if len(frames) < context:
+                    continue
+
+            f_ = frames if with_context else rgb
 
             if with_time:
-                yield t, frame
+
+                if with_context is 'right':
+                    t_ = timestamps[0]
+                elif with_context is 'center':
+                    t_ = timestamps[context / 2]
+                else:
+                    t_ = t
+
+                yield t_, f_
+
             else:
-                yield frame
+                yield f_
 
     def __call__(self, t):
         return self._get_frame(t)
@@ -378,28 +440,28 @@ class Video:
         # robust in the case where you get the nth frame by writing
         # _get_frame(n/fps).
 
-        pos = int(self.fps*t + 0.00001)+1
+        pos = int(self._fps * t + 0.00001)+1
 
-        if pos == self.pos:
-            return self.lastread
+        if pos == self._pos:
+            return self._lastread
         else:
-            if(pos < self.pos) or (pos > self.pos+100):
+            if(pos < self._pos) or (pos > self._pos+100):
                 self._initialize(t)
-                self.pos = pos
+                self._pos = pos
             else:
-                self._skip_frames(pos-self.pos-1)
+                self._skip_frames(pos-self._pos-1)
             result = self._read_frame()
-            self.pos = pos
+            self._pos = pos
             return result
 
     def _close(self):
-        if hasattr(self, 'proc'):
-            self.proc.terminate()
-            self.proc.stdout.close()
-            self.proc.stderr.close()
-            del self.proc
+        if hasattr(self, '_proc'):
+            self._proc.terminate()
+            self._proc.stdout.close()
+            self._proc.stderr.close()
+            del self._proc
 
     def __del__(self):
         self._close()
         if hasattr(self, 'lastread'):
-            del self.lastread
+            del self._lastread

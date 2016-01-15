@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 
-# Copyright (c) 2015 CNRS
+# Copyright (c) 2015-2016 CNRS
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,15 @@ from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 
-
 from .video import Video
-__all__ = ['Video']
+
+# video editing structure
+from .structure.shot import Shot
+from .structure.thread import Thread
+
+# face processing
+from .face.face import Face
+from .face.tracking import FaceTracking
+
+
+__all__ = ['Video', 'Shot', 'Thread', 'Face', 'FaceTracking']
