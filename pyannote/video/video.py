@@ -340,7 +340,7 @@ class Video:
                 "Using the last valid frame instead.",
                 UserWarning)
 
-            if not hasattr(self, 'lastread'):
+            if not hasattr(self, '_lastread'):
                 message = (
                     "MoviePy error: failed to read the first frame of "
                     "video file %s. That might mean that the file is "
@@ -463,5 +463,5 @@ class Video:
 
     def __del__(self):
         self._close()
-        if hasattr(self, 'lastread'):
+        if hasattr(self, '_lastread'):
             del self._lastread
