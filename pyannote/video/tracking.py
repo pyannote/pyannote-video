@@ -72,12 +72,12 @@ class TrackingByDetection(object):
     detect_func : func
         Detection function. Should take video frame as input and return list
         (or iterable) of detections as (left, top, right, bottom) tuples.
-    min_confidence : float, optional
+    track_min_confidence : float, optional
         Kill trackers whose confidence goes below this value. Defaults to 10.
-    min_overlap_ratio : float, optional
+    track_min_overlap_ratio : float, optional
         Do not associate trackers and detections if their overlap ratio goes
         below this value. Defaults to 0.3.
-    max_gap : float, optional
+    track_max_gap : float, optional
         Bridge gaps with duration shorter than this value.
 
     Usage
@@ -92,14 +92,14 @@ class TrackingByDetection(object):
     """
 
     def __init__(self, detect_func,
-                 min_confidence=10., min_overlap_ratio=0.3, max_gap=0.):
+                 track_min_confidence=10., track_min_overlap_ratio=0.3, track_max_gap=0.):
 
         super(TrackingByDetection, self).__init__()
 
         self.detect_func = detect_func
-        self.min_confidence = min_confidence
-        self.min_overlap_ratio = min_overlap_ratio
-        self.max_gap = max_gap
+        self.track_min_confidence = track_min_confidence
+        self.track_min_overlap_ratio = track_min_overlap_ratio
+        self.track_max_gap = track_max_gap
 
         self._hungarian = Munkres()
 
@@ -111,8 +111,8 @@ class TrackingByDetection(object):
 
     def _match(self, rectangle1, rectangle2):
         overlap = rectangle1.intersect(rectangle2).area()
-        if ((overlap < self.min_overlap_ratio * rectangle1.area()) or
-            (overlap < self.min_overlap_ratio * rectangle2.area())):
+        if ((overlap < self.track_min_overlap_ratio * rectangle1.area()) or
+            (overlap < self.track_min_overlap_ratio * rectangle2.area())):
             overlap = 0.
         return overlap
 
@@ -185,7 +185,7 @@ class TrackingByDetection(object):
             for identifier, tracker in list(self._trackers.items()):
                 confidence = tracker.update(frame)
                 self._confidences[identifier] = confidence
-                if confidence < self.min_confidence:
+                if confidence < self.track_min_confidence:
                     self._kill_tracker(identifier)
 
             # match trackers with detections at time t
@@ -284,7 +284,7 @@ class TrackingByDetection(object):
         tracks = sorted(tracks, key=get_min_max_t)
 
         # build graph where nodes are tracks and where matching tracks
-        # less than "max_gap" away are connected
+        # less than "track_max_gap" away are connected
         graph = nx.Graph()
         for i in xrange(len(tracks)):
             graph.add_node(i)
@@ -294,7 +294,7 @@ class TrackingByDetection(object):
             # only try to match tracks with a short gap between them
             ti = tracks[i][-1][0]
             tj = tracks[j][0][0]
-            if (tj < ti) or (tj - ti > self.max_gap):
+            if (tj < ti) or (tj - ti > self.track_max_gap):
                 continue
 
             # match tracks whose last and first position match
