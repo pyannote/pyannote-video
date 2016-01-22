@@ -28,19 +28,30 @@
 
 """Face detection and tracking
 
-The standard pipeline is the following (with optional face tracking)
+The standard pipeline is the following
 
-face detection => (face tracking =>) landmarks detection => feature extraction
+      face tracking => facial landmarks detection => feature extraction
 
 Usage:
-  pyannote-face track [options] [--verbose] <video> <shot.json> <output>
-  pyannote-face landmarks [--verbose] <video> <model> <tracking> <output>
-  pyannote-face features [--verbose] <video> <model> <landmark> <output>
-  pyannote-face demo [--from=<sec>] [--until=<sec>] [--shift=<sec>] [--label=<path>] [--shape=<path>] <video> <tracking> <output>
+  pyannote-face track [options] <video> <shot.json> <output>
+  pyannote-face landmarks [options] <video> <model> <tracking> <output>
+  pyannote-face features [options] <video> <model> <landmark> <output>
+  pyannote-face demo [options] <video> <tracking> <output>
   pyannote-face (-h | --help)
   pyannote-face --version
 
-Options:
+General options:
+
+  -h --help                 Show this screen.
+  --version                 Show version.
+  --verbose                 Show processing progress.
+
+Face tracking options (track):
+
+  <video>                   Path to video file.
+  <shot.json>               Path to shot segmentation result file.
+  <output>                  Path to tracking result file.
+
   --min-size=<ratio>        Approximate size (in video height ratio) of the
                             smallest face that should be detected. Default is
                             to try and detect any object [default: 0.0].
@@ -52,14 +63,34 @@ Options:
                             [default: 10.].
   --max-gap=<float>         Bridge gaps with duration shorter than <float>
                             [default: 1.].
+
+Facial landmarks detection options (landmarks):
+
+  <video>                   Path to video file.
+  <model>                   Path to dlib facial landmark detection model.
+  <tracking>                Path to tracking result file.
+  <output>                  Path to facial landmarks detection result file.
+
+Openface feature extraction options (features):
+
+  <video>                   Path to video file.
+  <model>                   Path to Openface feature extraction model.
+  <landmarks>               Path to facial landmarks detection result file.
+  <output>                  Path to facial landmarks detection result file.
+
+Visualization options (demo):
+
+  <video>                   Path to video file.
+  <tracking>                Path to tracking result file.
+  <output>                  Path to demo video file.
+
+  --height=<pixels>         Height of demo video file [default: 200].
   --from=<sec>              Encode demo from <sec> seconds [default: 0].
   --until=<sec>             Encode demo until <sec> seconds.
-  --shift=<sec>             Shift tracks by <sec> seconds [default: 0].
-  --label=<path>            Track labels.
-  --shape=<path>            Path to landmarks.
-  -h --help                 Show this screen.
-  --version                 Show version.
-  --verbose                 Show progress.
+  --shift=<sec>             Shift result files by <sec> seconds [default: 0].
+  --landmark=<path>         Path to facial landmarks detection result file.
+  --label=<path>            Path to track identification result file.
+
 """
 
 from __future__ import division
@@ -305,7 +336,7 @@ def features(video, model, shape, output):
 
             foutput.flush()
 
-def get_fl(tracking, frame_width, frame_height, shape=None, shift=0., labels=None):
+def get_fl(tracking, frame_width, frame_height, landmark=None, shift=0., labels=None):
 
     COLORS = [
         (240, 163, 255), (  0, 117, 220), (153,  63,   0), ( 76,   0,  92),
@@ -322,8 +353,8 @@ def get_fl(tracking, frame_width, frame_height, shape=None, shift=0., labels=Non
                                      double=True)
     faceGenerator.send(None)
 
-    if shape:
-        landmarkGenerator = getLandmarkGenerator(shape,
+    if landmark:
+        landmarkGenerator = getLandmarkGenerator(landmark,
                                                  frame_width, frame_height)
         landmarkGenerator.send(None)
 
@@ -335,7 +366,7 @@ def get_fl(tracking, frame_width, frame_height, shape=None, shift=0., labels=Non
         height, width, _ = frame.shape
         _, faces = faceGenerator.send(timestamp - shift)
 
-        if shape:
+        if landmark:
             _, landmarks = landmarkGenerator.send(timestamp - shift)
 
         cv2.putText(frame, '{t:.3f}'.format(t=timestamp), (10, height-10),
@@ -361,10 +392,10 @@ def get_fl(tracking, frame_width, frame_height, shape=None, shift=0., labels=Non
                         0.5, (255, 0, 0), 1, 8, False)
 
             # Draw nose
-            if shape:
-                _, landmark = landmarks[i]
-                pt1 = (int(landmark[27, 0]), int(landmark[27, 1]))
-                pt2 = (int(landmark[33, 0]), int(landmark[33, 1]))
+            if landmark:
+                _, points = landmarks[i]
+                pt1 = (int(points[27, 0]), int(points[27, 1]))
+                pt2 = (int(points[33, 0]), int(points[33, 1]))
                 cv2.line(frame, pt1, pt2, color, 1)
 
         return frame
@@ -455,14 +486,18 @@ if __name__ == '__main__':
         t_end = float(t_end) if t_end else None
 
         shift = float(arguments['--shift'])
+
         labels = arguments['--label']
         if not labels:
             labels = None
-        shape = arguments['--shape']
-        if not shape:
-            shape = None
+
+        landmark = arguments['--landmark']
+        if not landmark:
+            landmark = None
+
+        height = int(arguments['--height'])
 
         demo(filename, tracking, output,
              t_start=t_start, t_end=t_end,
-             shape=shape,
+             landmark=landmark, height=height,
              shift=shift, labels=labels)
