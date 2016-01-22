@@ -152,6 +152,11 @@ class Video(object):
         return self._duration
 
     @property
+    def frame_rate(self):
+        """Video frame rate"""
+        return self._fps
+    
+    @property
     def size(self):
         """Video size (width, height) in pixels"""
         return self._size
