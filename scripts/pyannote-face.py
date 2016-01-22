@@ -36,12 +36,16 @@ Usage:
   pyannote-face track [options] [--verbose] <video> <shot.json> <output>
   pyannote-face landmarks [--verbose] <video> <model> <tracking> <output>
   pyannote-face features [--verbose] <video> <model> <landmark> <output>
-  pyannote-face demo [--from=<sec>] [--until=<sec>] [--shift=<sec>] [--label=<path>] <video> <tracking> <output>
+  pyannote-face demo [--from=<sec>] [--until=<sec>] [--shift=<sec>] [--label=<path>] [--shape=<path>] <video> <tracking> <output>
   pyannote-face (-h | --help)
   pyannote-face --version
 
 Options:
-  --smallest=<size>         (Approximate) size of smallest face [default: 36].
+  --min-size=<ratio>        Approximate size (in video height ratio) of the
+                            smallest face that should be detected. Default is
+                            to try and detect any object [default: 0.0].
+  --every=<seconds>         Only apply detection every <seconds> seconds.
+                            Default is to process every frame [default: 0.0].
   --min-overlap=<ratio>     Associates face with tracker if overlap is greater
                             than <ratio> [default: 0.5].
   --min-confidence=<float>  Reset trackers with confidence lower than <float>
@@ -52,10 +56,13 @@ Options:
   --until=<sec>             Encode demo until <sec> seconds.
   --shift=<sec>             Shift tracks by <sec> seconds [default: 0].
   --label=<path>            Track labels.
+  --shape=<path>            Path to landmarks.
   -h --help                 Show this screen.
   --version                 Show version.
   --verbose                 Show progress.
 """
+
+from __future__ import division
 
 from docopt import docopt
 
@@ -76,23 +83,22 @@ import cv2
 import dlib
 
 
-SMALLEST_DEFAULT = 36
 MIN_OVERLAP_RATIO = 0.5
 MIN_CONFIDENCE = 10.
 MAX_GAP = 1.
 
 FACE_TEMPLATE = ('{t:.3f} {identifier:d} '
-                 '{left:d} {top:d} {right:d} {bottom:d} '
+                 '{left:.3f} {top:.3f} {right:.3f} {bottom:.3f} '
                  '{status:s}\n')
 
 
-def getFaceGenerator(tracking, double=True):
+def getFaceGenerator(tracking, frame_width, frame_height, double=True):
     """Parse precomputed face file and generate timestamped faces"""
 
     # load tracking file and sort it by timestamp
     names = ['t', 'track', 'left', 'top', 'right', 'bottom', 'status']
-    dtype = {'left': np.int32, 'top': np.int32,
-             'right': np.int32, 'bottom': np.int32}
+    dtype = {'left': np.float32, 'top': np.float32,
+             'right': np.float32, 'bottom': np.float32}
     tracking = read_table(tracking, delim_whitespace=True, header=None,
                           names=names, dtype=dtype)
     tracking = tracking.sort_values('t')
@@ -106,6 +112,11 @@ def getFaceGenerator(tracking, double=True):
     currentT = None
 
     for _, (T, identifier, left, top, right, bottom, status) in tracking.iterrows():
+
+        left = int(left * frame_width)
+        right = int(right * frame_width)
+        top = int(top * frame_height)
+        bottom = int(bottom * frame_height)
 
         face = rectangle(left, top, right, bottom)
 
@@ -144,7 +155,7 @@ def pairwise(iterable):
     return zip(a, a)
 
 
-def getShapeGenerator(shape):
+def getLandmarkGenerator(shape, frame_width, frame_height):
     """Parse precomputed shape file and generate timestamped shapes"""
 
     # load landmarks file
@@ -165,7 +176,9 @@ def getShapeGenerator(shape):
         T = float(row[0])
         identifier = int(row[1])
         landmarks = np.float32(list(pairwise(
-            [int(coordinate) for coordinate in row[2:]])))
+            [coordinate for coordinate in row[2:]])))
+        landmarks[:, 0] = np.round(landmarks[:, 0] * frame_width)
+        landmarks[:, 1] = np.round(landmarks[:, 1] * frame_height)
 
         # load all shapes from current frame
         # and only those shapes
@@ -197,15 +210,19 @@ def getShapeGenerator(shape):
         t = yield t, []
 
 
-def track(video, shot, output, smallest=36,
-          min_overlap_ratio=MIN_OVERLAP_RATIO, min_confidence=MIN_CONFIDENCE,
-          max_gap=MAX_GAP):
+def track(video, shot, output,
+          detect_min_size=0.0,
+          detect_every=0.0,
+          track_min_overlap_ratio=MIN_OVERLAP_RATIO,
+          track_min_confidence=MIN_CONFIDENCE,
+          track_max_gap=MAX_GAP):
     """Tracking by detection"""
 
-    tracking = FaceTracking(smallest=smallest,
-                            min_overlap_ratio=min_overlap_ratio,
-                            min_confidence=min_confidence,
-                            max_gap=max_gap)
+    tracking = FaceTracking(detect_min_size=detect_min_size,
+                            detect_every=detect_every,
+                            track_min_overlap_ratio=track_min_overlap_ratio,
+                            track_min_confidence=track_min_confidence,
+                            track_max_gap=track_max_gap)
 
     shot = load(shot)
 
@@ -228,7 +245,10 @@ def landmark(video, model, tracking, output):
     """Facial features detection"""
 
     # face generator
-    faceGenerator = getFaceGenerator(tracking, double=False)
+    frame_width, frame_height = video.frame_size
+    faceGenerator = getFaceGenerator(tracking,
+                                     frame_width, frame_height,
+                                     double=False)
     faceGenerator.send(None)
 
     face = Face(landmarks=model)
@@ -249,7 +269,8 @@ def landmark(video, model, tracking, output):
                 foutput.write('{t:.3f} {identifier:d}'.format(
                     t=T, identifier=identifier))
                 for x, y in landmarks:
-                    foutput.write(' {x:d} {y:d}'.format(x=int(x), y=int(y)))
+                    foutput.write(' {x:.5f} {y:.5f}'.format(x=x / frame_width,
+                                                            y=y / frame_height))
                 foutput.write('\n')
 
             foutput.flush()
@@ -260,14 +281,15 @@ def features(video, model, shape, output):
     face = Face(size=96, openface=model)
 
     # shape generator
-    shapeGenerator = getShapeGenerator(shape)
-    shapeGenerator.send(None)
+    frame_width, frame_height = video.frame_size
+    landmarkGenerator = getLandmarkGenerator(shape, frame_width, frame_height)
+    landmarkGenerator.send(None)
 
     with open(output, 'w') as foutput:
 
         for timestamp, rgb in video:
 
-            T, shapes = shapeGenerator.send(timestamp)
+            T, shapes = landmarkGenerator.send(timestamp)
 
             for identifier, landmarks in shapes:
                 normalized_rgb = face._get_normalized(rgb, landmarks)
@@ -283,7 +305,7 @@ def features(video, model, shape, output):
 
             foutput.flush()
 
-def get_fl(tracking, shift=0., labels=None):
+def get_fl(tracking, frame_width, frame_height, shape=None, shift=0., labels=None):
 
     COLORS = [
         (240, 163, 255), (  0, 117, 220), (153,  63,   0), ( 76,   0,  92),
@@ -295,8 +317,15 @@ def get_fl(tracking, shift=0., labels=None):
         (255, 255,   0), (255,  80,   5)
     ]
 
-    faceGenerator = getFaceGenerator(tracking, double=True)
+    faceGenerator = getFaceGenerator(tracking,
+                                     frame_width, frame_height,
+                                     double=True)
     faceGenerator.send(None)
+
+    if shape:
+        landmarkGenerator = getLandmarkGenerator(shape,
+                                                 frame_width, frame_height)
+        landmarkGenerator.send(None)
 
     if labels is None:
         labels = dict()
@@ -306,9 +335,12 @@ def get_fl(tracking, shift=0., labels=None):
         height, width, _ = frame.shape
         _, faces = faceGenerator.send(timestamp - shift)
 
+        if shape:
+            _, landmarks = landmarkGenerator.send(timestamp - shift)
+
         cv2.putText(frame, '{t:.3f}'.format(t=timestamp), (10, height-10),
                     cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1, 8, False)
-        for identifier, face, _ in faces:
+        for i, (identifier, face, _) in enumerate(faces):
             color = COLORS[identifier % len(COLORS)]
 
             # Draw face bounding box
@@ -327,13 +359,22 @@ def get_fl(tracking, shift=0., labels=None):
                         '{label:s}'.format(label=label),
                         (pt1[0], pt1[1] - 7), cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, (255, 0, 0), 1, 8, False)
+
+            # Draw nose
+            if shape:
+                _, landmark = landmarks[i]
+                pt1 = (int(landmark[27, 0]), int(landmark[27, 1]))
+                pt2 = (int(landmark[33, 0]), int(landmark[33, 1]))
+                cv2.line(frame, pt1, pt2, color, 1)
+
         return frame
 
     return overlay
 
 
 def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
-         labels=None):
+         labels=None, shape=None):
+
 
     import os
     os.environ['IMAGEIO_FFMPEG_EXE'] = 'ffmpeg'
@@ -348,8 +389,11 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
                 labels[identifier] = label
 
     original_clip = VideoFileClip(filename)
+    frame_width, frame_height = original_clip.size
     modified_clip = original_clip.fl(get_fl(tracking,
+                                            frame_width, frame_height,
                                             shift=shift,
+                                            shape=shape,
                                             labels=labels))
     cropped_clip = modified_clip.subclip(t_start=t_start, t_end=t_end)
     cropped_clip.write_videofile(output)
@@ -373,13 +417,17 @@ if __name__ == '__main__':
 
         shot = arguments['<shot.json>']
         output = arguments['<output>']
-        min_overlap_ratio = float(arguments['--min-overlap'])
-        min_confidence = float(arguments['--min-confidence'])
-        max_gap = float(arguments['--max-gap'])
+        detect_min_size = float(arguments['--min-size'])
+        detect_every = float(arguments['--every'])
+        track_min_overlap_ratio = float(arguments['--min-overlap'])
+        track_min_confidence = float(arguments['--min-confidence'])
+        track_max_gap = float(arguments['--max-gap'])
         track(video, shot, output,
-              min_overlap_ratio=min_overlap_ratio,
-              min_confidence=min_confidence,
-              max_gap=max_gap)
+              detect_min_size=detect_min_size,
+              detect_every=detect_every,
+              track_min_overlap_ratio=track_min_overlap_ratio,
+              track_min_confidence=track_min_confidence,
+              track_max_gap=track_max_gap)
 
     # facial features detection
     if arguments['landmarks']:
@@ -410,7 +458,11 @@ if __name__ == '__main__':
         labels = arguments['--label']
         if not labels:
             labels = None
+        shape = arguments['--shape']
+        if not shape:
+            shape = None
 
         demo(filename, tracking, output,
              t_start=t_start, t_end=t_end,
+             shape=shape,
              shift=shift, labels=labels)
