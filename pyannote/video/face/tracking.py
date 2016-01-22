@@ -47,25 +47,32 @@ class FaceTracking(TrackingByDetection):
 
     Parameters
     ----------
-    smallest : int, optional
-        Approximate size in pixel of the smallest face that should be
-        detected. Defaults to 36.
-    min_confidence : float, optional
+    detect_min_size : float, optional
+        Approximate size (in video height ratio) of the smallest face that
+        should be detected. Defaults to any face.
+    detect_every : float, optional
+        When provided, face detection is applied every `detect_every` seconds.
+        Defaults to processing every frame.
+    track_min_confidence : float, optional
         Kill trackers whose confidence goes below this value. Defaults to 10.
-    min_overlap_ratio : float, optional
+    track_min_overlap_ratio : float, optional
         Do not associate trackers and detections if their overlap ratio goes
         below this value. Defaults to 0.3.
-    max_gap : float, optional
+    track_max_gap : float, optional
         Bridge gaps with duration shorter than this value.
     """
-    def __init__(self, smallest=SMALLEST_DEFAULT,
-                 min_confidence=10., min_overlap_ratio=0.3, max_gap=0.):
+    def __init__(self, detect_min_size=0., detect_every=0.,
+                 track_min_confidence=10.,track_min_overlap_ratio=0.3,
+                 track_max_gap=0.):
 
-        face = Face(smallest=smallest)
+        face = Face()
         detect_func = get_face_detect(face)
 
         super(FaceTracking, self).__init__(
             detect_func=detect_func,
-            min_confidence=min_confidence,
-            min_overlap_ratio=min_overlap_ratio,
-            max_gap=max_gap)
+            detect_smallest=DLIB_SMALLEST_FACE,
+            detect_min_size=detect_min_size,
+            detect_every=detect_every,
+            track_min_confidence=track_min_confidence,
+            track_min_overlap_ratio=track_min_overlap_ratio,
+            track_max_gap=track_max_gap)
