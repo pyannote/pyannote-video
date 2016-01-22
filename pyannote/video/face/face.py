@@ -111,7 +111,7 @@ class Face(object):
 
     def iterfaces(self, rgb):
         """Iterate over all detected faces"""
-        for face in self._face_detector(rgb, 1.0):
+        for face in self._face_detector(rgb, 1):
             yield face
 
     # landmarks detection
