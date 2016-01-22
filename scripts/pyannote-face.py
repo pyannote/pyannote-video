@@ -84,7 +84,7 @@ Visualization options (demo):
   <tracking>                Path to tracking result file.
   <output>                  Path to demo video file.
 
-  --height=<pixels>         Height of demo video file [default: 200].
+  --height=<pixels>         Height of demo video file [default: 400].
   --from=<sec>              Encode demo from <sec> seconds [default: 0].
   --until=<sec>             Encode demo until <sec> seconds.
   --shift=<sec>             Shift result files by <sec> seconds [default: 0].
@@ -336,7 +336,8 @@ def features(video, model, shape, output):
 
             foutput.flush()
 
-def get_fl(tracking, frame_width, frame_height, landmark=None, shift=0., labels=None):
+def get_make_frame(video, tracking, landmark=None, labels=None,
+                   height=200, shift=0.0):
 
     COLORS = [
         (240, 163, 255), (  0, 117, 220), (153,  63,   0), ( 76,   0,  92),
@@ -348,28 +349,30 @@ def get_fl(tracking, frame_width, frame_height, landmark=None, shift=0., labels=
         (255, 255,   0), (255,  80,   5)
     ]
 
-    faceGenerator = getFaceGenerator(tracking,
-                                     frame_width, frame_height,
-                                     double=True)
+    video_width, video_height = video.size
+    ratio = height / video_height
+    width = int(ratio * video_width)
+    video.frame_size = (width, height)
+
+    faceGenerator = getFaceGenerator(tracking, width, height, double=True)
     faceGenerator.send(None)
 
     if landmark:
-        landmarkGenerator = getLandmarkGenerator(landmark,
-                                                 frame_width, frame_height)
+        landmarkGenerator = getLandmarkGenerator(landmark, width, height)
         landmarkGenerator.send(None)
 
     if labels is None:
         labels = dict()
 
-    def overlay(get_frame, timestamp):
-        frame = get_frame(timestamp)
-        height, width, _ = frame.shape
-        _, faces = faceGenerator.send(timestamp - shift)
+    def make_frame(t):
+
+        frame = video(t)
+        _, faces = faceGenerator.send(t - shift)
 
         if landmark:
-            _, landmarks = landmarkGenerator.send(timestamp - shift)
+            _, landmarks = landmarkGenerator.send(t - shift)
 
-        cv2.putText(frame, '{t:.3f}'.format(t=timestamp), (10, height-10),
+        cv2.putText(frame, '{t:.3f}'.format(t=t), (10, height-10),
                     cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1, 8, False)
         for i, (identifier, face, _) in enumerate(faces):
             color = COLORS[identifier % len(COLORS)]
@@ -400,17 +403,13 @@ def get_fl(tracking, frame_width, frame_height, landmark=None, shift=0., labels=
 
         return frame
 
-    return overlay
+    return make_frame
 
 
 def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
          labels=None, landmark=None, height=200):
 
-
-    import os
-    os.environ['IMAGEIO_FFMPEG_EXE'] = 'ffmpeg'
-    from moviepy.video.io.VideoFileClip import VideoFileClip
-
+    # parse label file
     if labels is not None:
         with open(labels, 'r') as f:
             labels = {}
@@ -419,16 +418,24 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
                 identifier = int(identifier)
                 labels[identifier] = label
 
-    original_clip = VideoFileClip(filename)
-    frame_width, frame_height = original_clip.size
-    modified_clip = original_clip.fl(get_fl(tracking,
-                                            frame_width, frame_height,
-                                            shift=shift,
-                                            landmark=landmark,
-                                            labels=labels))
-    cropped_clip = modified_clip.subclip(t_start=t_start, t_end=t_end)
-    cropped_clip.write_videofile(output)
+    video = Video(filename)
 
+    import os
+    os.environ['IMAGEIO_FFMPEG_EXE'] = 'ffmpeg'
+    # from moviepy.video.io.VideoFileClip import VideoFileClip
+
+    from moviepy.editor import VideoClip, AudioFileClip
+
+    make_frame = get_make_frame(video, tracking, landmark=landmark,
+                                labels=labels, height=height, shift=shift)
+    video_clip = VideoClip(make_frame, duration=video.duration)
+    audio_clip = AudioFileClip(filename)
+    clip = video_clip.set_audio(audio_clip)
+
+    if t_end is None:
+        t_end = video.duration
+
+    clip.subclip(t_start, t_end).write_videofile(output, fps=video.frame_rate)
 
 if __name__ == '__main__':
 
