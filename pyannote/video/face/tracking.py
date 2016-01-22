@@ -29,7 +29,7 @@
 """Face tracking"""
 
 from .face import Face
-from .face import SMALLEST_DEFAULT
+from .face import DLIB_SMALLEST_FACE
 from ..tracking import TrackingByDetection
 
 

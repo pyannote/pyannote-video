@@ -34,7 +34,7 @@ import dlib
 import cv2
 from .openface import TorchWrap
 
-SMALLEST_DEFAULT = 36
+DLIB_SMALLEST_FACE = 36
 
 TEMPLATE = np.float32([
     (0.0792396913815, 0.339223741112), (0.0829219487236, 0.456955367943),
