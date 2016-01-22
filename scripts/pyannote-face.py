@@ -404,7 +404,7 @@ def get_fl(tracking, frame_width, frame_height, landmark=None, shift=0., labels=
 
 
 def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
-         labels=None, shape=None):
+         labels=None, landmark=None, height=200):
 
 
     import os
@@ -424,7 +424,7 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
     modified_clip = original_clip.fl(get_fl(tracking,
                                             frame_width, frame_height,
                                             shift=shift,
-                                            shape=shape,
+                                            landmark=landmark,
                                             labels=labels))
     cropped_clip = modified_clip.subclip(t_start=t_start, t_end=t_end)
     cropped_clip.write_videofile(output)
