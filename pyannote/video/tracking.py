@@ -79,6 +79,9 @@ class TrackingByDetection(object):
     detect_min_size : float, optional
         Approximate size (in video height ratio) of the smallest object that
         should be detected. Defaults to any object.
+    detect_every : float, optional
+        When provided, `detect_func` is applied every `detect_every` seconds.
+        Defaults to processing every frame.
     track_min_confidence : float, optional
         Kill trackers whose confidence goes below this value. Defaults to 10.
     track_min_overlap_ratio : float, optional
@@ -100,6 +103,7 @@ class TrackingByDetection(object):
 
     def __init__(self, detect_func, detect_smallest=1,
                  detect_min_size=0.,
+                 detect_every=0.,
                  track_min_confidence=10., track_min_overlap_ratio=0.3,
                  track_max_gap=0.):
 
@@ -108,6 +112,8 @@ class TrackingByDetection(object):
         self.detect_func = detect_func
         self.detect_smallest = detect_smallest
         self.detect_min_size = detect_min_size
+        self.detect_every = detect_every
+
         self.track_min_confidence = track_min_confidence
         self.track_min_overlap_ratio = track_min_overlap_ratio
         self.track_max_gap = track_max_gap
@@ -373,6 +379,12 @@ class TrackingByDetection(object):
         segmentation :
         """
 
+        # should detection be applied to every frame or once every "x" frames?
+        if self.detect_every > 0.0:
+            every_x_frames = int(self.detect_every * video.frame_rate)
+        else:
+            every_x_frames = 1
+
         # estimate downscaling ratio
         width, height = video.size
         ratio = 1.0
@@ -391,7 +403,7 @@ class TrackingByDetection(object):
         segment_generator.send(None)
         self._reset()
 
-        for t, frame in video:
+        for i, (t, frame) in enumerate(video):
 
             segment = segment_generator.send(t)
 
@@ -407,10 +419,12 @@ class TrackingByDetection(object):
             # cache frame (for faster tracking)
             self._frame_cache.append((t, frame))
 
-            # detection
             self._tracking_graph.add_node(t)
-            for detection in self.detect_func(frame):
-                self._tracking_graph.add_edge(t, (t, detection, DETECTION))
+
+            # apply detection every x frames
+            if i % every_x_frames == 0:
+                for detection in self.detect_func(frame):
+                    self._tracking_graph.add_edge(t, (t, detection, DETECTION))
 
         for track in self._forward_backward():
             yield self._normalize_track(track, frame_width, frame_height)
