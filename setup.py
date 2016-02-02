@@ -24,7 +24,7 @@
 # SOFTWARE.
 
 # AUTHORS
-# Hervé BREDIN - http://herve.niderb.fr
+# Herve BREDIN - http://herve.niderb.fr
 
 
 from setuptools import setup, find_packages
