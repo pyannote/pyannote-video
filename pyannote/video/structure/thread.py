@@ -36,6 +36,8 @@ from pyannote.core.time import _t_iter as getLabelGenerator
 from tqdm import tqdm
 import warnings
 
+OPENCV = int(cv2.__version__.split('.')[0])
+
 try:
     # Python 3
     from functools import lru_cache
@@ -88,7 +90,10 @@ class Thread(object):
         self.verbose = verbose
 
         # ORB (non-patented SIFT alternative) extraction
-        self._orb = cv2.ORB()
+        if OPENCV == 2:
+            self._orb = cv2.ORB()
+        elif OPENCV == 3:
+            self._orb = cv2.ORB_create()
 
         # # brute-force ORB matching
         # self._bfmatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
