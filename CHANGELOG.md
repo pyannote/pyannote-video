@@ -1,3 +1,10 @@
+### Version 1.3 (2016-02-17)
+
+  - feat: face clustering
+  - fix: OpenCV 2/3 support
+  - improve: shot threading
+  - improve: faster face tracking-by-detection
+
 ### Version 1.2.1 (2016-01-20)
 
   - fix: __iter__ would incorrectly raise an IOError at the end of some Videos
