@@ -69,7 +69,7 @@ class Thread(object):
     segmentation into shots.
 
     """
-    def __init__(self, video, shot=None, min_match=20, lookahead=24,
+    def __init__(self, video, shot=None, height=200, min_match=20, lookahead=5,
                  verbose=False):
         """
         Parameters
@@ -81,6 +81,11 @@ class Thread(object):
         super(Thread, self).__init__()
 
         self.video = video
+        self.height = height
+
+        # estimate new size from video size and target height
+        w, h = self.video._size
+        self._resize = (self.height, w * self.height / h)
 
         self.lookahead = lookahead
         if shot is None:
@@ -115,7 +120,7 @@ class Thread(object):
     @lru_cache(maxsize=128, typed=False)
     def _compute_orb(self, t):
         try:
-            rgb = self.video(t)
+            rgb = cv2.resize(self.video(t), self._resize)
             gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
             _, descriptors = self._orb.detectAndCompute(gray, None)
 
