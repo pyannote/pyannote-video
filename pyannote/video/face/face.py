@@ -24,7 +24,7 @@
 # SOFTWARE.
 
 # AUTHORS
-# Hervé BREDIN - http://herve.niderb.fr
+# Herve BREDIN - http://herve.niderb.fr
 
 """Face processing"""
 
@@ -34,7 +34,7 @@ import dlib
 import cv2
 from .openface import TorchWrap
 
-SMALLEST_DEFAULT = 36
+DLIB_SMALLEST_FACE = 36
 
 TEMPLATE = np.float32([
     (0.0792396913815, 0.339223741112), (0.0829219487236, 0.456955367943),
@@ -79,17 +79,13 @@ OUTER_EYES_AND_NOSE = np.array([36, 45, 33])
 
 class Face(object):
     """Face processing"""
-    def __init__(self, landmarks=None, smallest=SMALLEST_DEFAULT,
-                 openface=None, size=96):
+    def __init__(self, landmarks=None, openface=None, size=96):
         """Face detection
 
         Parameters
         ----------
         landmarks : str
             Path to dlib's 68 facial landmarks predictor model.
-        smallest : int
-            Approximate size in pixel of the smallest face that should be
-            detected.
         size : int
             Size of the normalized face thumbnail.
         openface : str
@@ -99,10 +95,6 @@ class Face(object):
 
         # face detection
         self._face_detector = dlib.get_frontal_face_detector()
-        if smallest > SMALLEST_DEFAULT:
-            self._upscale = 1
-        else:
-            self._upscale = int(np.ceil(SMALLEST_DEFAULT / smallest))
 
         # landmark detection
         if landmarks is not None:
@@ -119,7 +111,7 @@ class Face(object):
 
     def iterfaces(self, rgb):
         """Iterate over all detected faces"""
-        for face in self._face_detector(rgb, self._upscale):
+        for face in self._face_detector(rgb, 1):
             yield face
 
     # landmarks detection

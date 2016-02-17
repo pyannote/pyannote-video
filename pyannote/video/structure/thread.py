@@ -24,7 +24,7 @@
 # SOFTWARE.
 
 # AUTHORS
-# Hervé BREDIN - http://herve.niderb.fr
+# Herve BREDIN - http://herve.niderb.fr
 
 
 from collections import deque
@@ -35,6 +35,8 @@ from pyannote.core import Annotation
 from pyannote.core.time import _t_iter as getLabelGenerator
 from tqdm import tqdm
 import warnings
+
+OPENCV = int(cv2.__version__.split('.')[0])
 
 try:
     # Python 3
@@ -67,7 +69,7 @@ class Thread(object):
     segmentation into shots.
 
     """
-    def __init__(self, video, shot=None, min_match=20, lookahead=24,
+    def __init__(self, video, shot=None, height=200, min_match=20, lookahead=5,
                  verbose=False):
         """
         Parameters
@@ -79,6 +81,11 @@ class Thread(object):
         super(Thread, self).__init__()
 
         self.video = video
+        self.height = height
+
+        # estimate new size from video size and target height
+        w, h = self.video._size
+        self._resize = (self.height, w * self.height / h)
 
         self.lookahead = lookahead
         if shot is None:
@@ -88,7 +95,10 @@ class Thread(object):
         self.verbose = verbose
 
         # ORB (non-patented SIFT alternative) extraction
-        self._orb = cv2.ORB()
+        if OPENCV == 2:
+            self._orb = cv2.ORB()
+        elif OPENCV == 3:
+            self._orb = cv2.ORB_create()
 
         # # brute-force ORB matching
         # self._bfmatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
@@ -110,7 +120,7 @@ class Thread(object):
     @lru_cache(maxsize=128, typed=False)
     def _compute_orb(self, t):
         try:
-            rgb = self.video(t)
+            rgb = cv2.resize(self.video(t), self._resize)
             gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
             _, descriptors = self._orb.detectAndCompute(gray, None)
 
@@ -138,12 +148,20 @@ class Thread(object):
             if best.distance < 0.7 * secondBest.distance:
                 count = count + 1
 
-        return count > self.min_match
+        return count
 
     def _threads_graph(self):
+        """Build and return thread graph
 
-        # 5-frames collar
-        collar = 5. / self.video._fps
+        Contains one node per shot.
+        Shots `n` and `n+k` are connected iff the last frames
+        of shot `n` are similar to the first frames of shot `n+k`
+        (with k < lookahead)
+
+        """
+
+        # 10-frames collar
+        collar = 10. / self.video.frame_rate
 
         # build threading graph by comparing each shot
         # to 'lookahead' following shots
@@ -160,8 +178,9 @@ class Thread(object):
             orbLast = self._compute_orb(current.end - collar)
             orbFirst = self._compute_orb(following.start + collar)
             threads.add_node(current)
-            if self._match(orbLast, orbFirst):
-                threads.add_edge(current, following)
+            n_matches = self._match(orbLast, orbFirst)
+            if n_matches > self.min_match:
+                threads.add_edge(current, following, n_matches=n_matches)
         threads.add_node(following)
         return threads
 

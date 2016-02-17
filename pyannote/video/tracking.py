@@ -24,10 +24,11 @@
 # SOFTWARE.
 
 # AUTHORS
-# Hervé BREDIN - http://herve.niderb.fr
+# Herve BREDIN - http://herve.niderb.fr
 
 """Tracking by detection"""
 
+from __future__ import division
 import itertools
 import numpy as np
 import networkx as nx
@@ -72,12 +73,21 @@ class TrackingByDetection(object):
     detect_func : func
         Detection function. Should take video frame as input and return list
         (or iterable) of detections as (left, top, right, bottom) tuples.
-    min_confidence : float, optional
+    detect_smallest : int, optional
+        Smallest object (height, in pixels) that `detect_func` can detect.
+        Defaults to any object.
+    detect_min_size : float, optional
+        Approximate size (in video height ratio) of the smallest object that
+        should be detected. Defaults to any object.
+    detect_every : float, optional
+        When provided, `detect_func` is applied every `detect_every` seconds.
+        Defaults to processing every frame.
+    track_min_confidence : float, optional
         Kill trackers whose confidence goes below this value. Defaults to 10.
-    min_overlap_ratio : float, optional
+    track_min_overlap_ratio : float, optional
         Do not associate trackers and detections if their overlap ratio goes
         below this value. Defaults to 0.3.
-    max_gap : float, optional
+    track_max_gap : float, optional
         Bridge gaps with duration shorter than this value.
 
     Usage
@@ -91,15 +101,22 @@ class TrackingByDetection(object):
     ...     pass
     """
 
-    def __init__(self, detect_func,
-                 min_confidence=10., min_overlap_ratio=0.3, max_gap=0.):
+    def __init__(self, detect_func, detect_smallest=1,
+                 detect_min_size=0.,
+                 detect_every=0.,
+                 track_min_confidence=10., track_min_overlap_ratio=0.3,
+                 track_max_gap=0.):
 
         super(TrackingByDetection, self).__init__()
 
         self.detect_func = detect_func
-        self.min_confidence = min_confidence
-        self.min_overlap_ratio = min_overlap_ratio
-        self.max_gap = max_gap
+        self.detect_smallest = detect_smallest
+        self.detect_min_size = detect_min_size
+        self.detect_every = detect_every
+
+        self.track_min_confidence = track_min_confidence
+        self.track_min_overlap_ratio = track_min_overlap_ratio
+        self.track_max_gap = track_max_gap
 
         self._hungarian = Munkres()
 
@@ -111,8 +128,8 @@ class TrackingByDetection(object):
 
     def _match(self, rectangle1, rectangle2):
         overlap = rectangle1.intersect(rectangle2).area()
-        if ((overlap < self.min_overlap_ratio * rectangle1.area()) or
-            (overlap < self.min_overlap_ratio * rectangle2.area())):
+        if ((overlap < self.track_min_overlap_ratio * rectangle1.area()) or
+            (overlap < self.track_min_overlap_ratio * rectangle2.area())):
             overlap = 0.
         return overlap
 
@@ -185,7 +202,7 @@ class TrackingByDetection(object):
             for identifier, tracker in list(self._trackers.items()):
                 confidence = tracker.update(frame)
                 self._confidences[identifier] = confidence
-                if confidence < self.min_confidence:
+                if confidence < self.track_min_confidence:
                     self._kill_tracker(identifier)
 
             # match trackers with detections at time t
@@ -213,10 +230,10 @@ class TrackingByDetection(object):
                 # to the current position of the tracker
                 position = tracker.get_position()
                 position = (
-                    int(round(position.left())),
-                    int(round(position.top())),
-                    int(round(position.right())),
-                    int(round(position.bottom()))
+                    position.left(),
+                    position.top(),
+                    position.right(),
+                    position.bottom()
                 )
                 current = (t, position, direction)
                 self._tracking_graph.add_edge(
@@ -284,7 +301,7 @@ class TrackingByDetection(object):
         tracks = sorted(tracks, key=get_min_max_t)
 
         # build graph where nodes are tracks and where matching tracks
-        # less than "max_gap" away are connected
+        # less than "track_max_gap" away are connected
         graph = nx.Graph()
         for i in xrange(len(tracks)):
             graph.add_node(i)
@@ -294,7 +311,7 @@ class TrackingByDetection(object):
             # only try to match tracks with a short gap between them
             ti = tracks[i][-1][0]
             tj = tracks[j][0][0]
-            if (tj < ti) or (tj - ti > self.max_gap):
+            if (tj < ti) or (tj - ti > self.track_max_gap):
                 continue
 
             # match tracks whose last and first position match
@@ -344,6 +361,16 @@ class TrackingByDetection(object):
         self._frame_cache = []
         self._tracking_graph = nx.DiGraph()
 
+    def _normalize_track(self, track, frame_width, frame_height):
+        normalized_track = []
+        for (t, (left, top, right, bottom), status) in track:
+            left = left / frame_width
+            right = right / frame_width
+            top = top / frame_height
+            bottom = bottom / frame_height
+            normalized_track.append((t, (left, top, right, bottom), status))
+        return normalized_track
+
     def __call__(self, video, segmentation):
         """
         Parameters
@@ -352,11 +379,31 @@ class TrackingByDetection(object):
         segmentation :
         """
 
+        # should detection be applied to every frame or once every "x" frames?
+        if self.detect_every > 0.0:
+            every_x_frames = int(self.detect_every * video.frame_rate)
+        else:
+            every_x_frames = 1
+
+        # estimate downscaling ratio
+        width, height = video.size
+        ratio = 1.0
+        if self.detect_min_size > 0.0:
+            ratio = self.detect_smallest / (self.detect_min_size * height)
+            ratio = min(1.0, ratio)
+
+        # tell video instance how to downscale its frames
+        # (and keep track of previous setting)
+        old_frame_width, old_frame_height = video.frame_size
+        frame_width = int(width * ratio)
+        frame_height = int(height * ratio)
+        video.frame_size = (frame_width, frame_height)
+
         segment_generator = get_segment_generator(segmentation)
         segment_generator.send(None)
         self._reset()
 
-        for t, frame in video:
+        for i, (t, frame) in enumerate(video):
 
             segment = segment_generator.send(t)
 
@@ -364,7 +411,7 @@ class TrackingByDetection(object):
 
                 # forward/backward tracking
                 for track in self._forward_backward():
-                    yield track
+                    yield self._normalize_track(track, frame_width, frame_height)
 
                 # start fresh for next segment
                 self._reset()
@@ -372,10 +419,16 @@ class TrackingByDetection(object):
             # cache frame (for faster tracking)
             self._frame_cache.append((t, frame))
 
-            # detection
             self._tracking_graph.add_node(t)
-            for detection in self.detect_func(frame):
-                self._tracking_graph.add_edge(t, (t, detection, DETECTION))
+
+            # apply detection every x frames
+            if i % every_x_frames == 0:
+                for detection in self.detect_func(frame):
+                    self._tracking_graph.add_edge(t, (t, detection, DETECTION))
 
         for track in self._forward_backward():
-            yield track
+            yield self._normalize_track(track, frame_width, frame_height)
+
+        # revert frame size to its original setting
+        if self.detect_min_size > 0.0:
+            video.frame_size = (old_frame_width, old_frame_height)

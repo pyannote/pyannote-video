@@ -34,6 +34,7 @@ from __future__ import division
 import subprocess as sp
 import os
 import re
+import cv2
 import warnings
 import logging
 import numpy as np
@@ -90,7 +91,7 @@ def _cvsecs(time):
         return time
 
 
-class Video:
+class Video(object):
 
     def __init__(self, filename, start=None, end=None, step=None,
                  ffmpeg='ffmpeg', verbose=False):
@@ -119,6 +120,7 @@ class Video:
         infos = self._parse_infos(print_infos=False, check_duration=True)
         self._fps = infos['video_fps']
         self._size = infos['video_size']
+        self._width, self._height = self._size
         self._duration = infos['video_duration']
         # self.ffmpeg_duration = infos['duration']
         self._nframes = infos['video_nframes']
@@ -142,6 +144,35 @@ class Video:
         self._initialize()
 
         self._pos = 1
+        self._lastread = self._read_frame()
+
+    @property
+    def duration(self):
+        """Video duration in seconds"""
+        return self._duration
+
+    @property
+    def frame_rate(self):
+        """Video frame rate"""
+        return self._fps
+    
+    @property
+    def size(self):
+        """Video size (width, height) in pixels"""
+        return self._size
+
+    @property
+    def frame_size(self):
+        """Frame size (width, height) in pixels"""
+        return [self._width, self._height]
+
+    @frame_size.setter
+    def frame_size(self, value):
+        self._initialize()
+        self._pos = 1
+        self._width, self._height = value
+        if hasattr(self, '_lastread'):
+            del self._lastread
         self._lastread = self._read_frame()
 
     def _parse_infos(self, print_infos=False, check_duration=True):
@@ -356,8 +387,9 @@ class Video:
         else:
 
             result = np.fromstring(s, dtype='uint8')
-            # reshape((h, w, len(s)//(w*h)))
             result.shape = (h, w, len(s)//(w*h))
+            if self._width != w or self._height != h:
+                result = cv2.resize(result, (self._width, self._height))
             self._lastread = result
 
         return result
