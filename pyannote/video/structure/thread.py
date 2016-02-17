@@ -148,12 +148,20 @@ class Thread(object):
             if best.distance < 0.7 * secondBest.distance:
                 count = count + 1
 
-        return count > self.min_match
+        return count
 
     def _threads_graph(self):
+        """Build and return thread graph
 
-        # 5-frames collar
-        collar = 5. / self.video._fps
+        Contains one node per shot.
+        Shots `n` and `n+k` are connected iff the last frames
+        of shot `n` are similar to the first frames of shot `n+k`
+        (with k < lookahead)
+
+        """
+
+        # 10-frames collar
+        collar = 10. / self.video.frame_rate
 
         # build threading graph by comparing each shot
         # to 'lookahead' following shots
@@ -170,8 +178,9 @@ class Thread(object):
             orbLast = self._compute_orb(current.end - collar)
             orbFirst = self._compute_orb(following.start + collar)
             threads.add_node(current)
-            if self._match(orbLast, orbFirst):
-                threads.add_edge(current, following)
+            n_matches = self._match(orbLast, orbFirst)
+            if n_matches > self.min_match:
+                threads.add_edge(current, following, n_matches=n_matches)
         threads.add_node(following)
         return threads
 
