@@ -1,3 +1,7 @@
+### Version 1.3.1 (2016-03-25)
+
+  - fix: pyannote.core breaking changes
+
 ### Version 1.3 (2016-02-17)
 
   - feat: face clustering
