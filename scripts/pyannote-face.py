@@ -98,7 +98,7 @@ from __future__ import division
 from docopt import docopt
 
 from pyannote.core import Annotation
-from pyannote.core.json import load
+import pyannote.core.json
 
 from pyannote.video import __version__
 from pyannote.video import Video
@@ -255,7 +255,8 @@ def track(video, shot, output,
                             track_min_confidence=track_min_confidence,
                             track_max_gap=track_max_gap)
 
-    shot = load(shot)
+    with open(shot, 'r') as fp:
+        shot = pyannote.core.json.load(fp)
 
     if isinstance(shot, Annotation):
         shot = shot.get_timeline()

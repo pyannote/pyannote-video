@@ -54,7 +54,7 @@ Options:
 from docopt import docopt
 
 from pyannote.core import Timeline
-from pyannote.core.json import dump, load
+import pyannote.core.json
 
 from pyannote.video import __version__
 from pyannote.video import Video
@@ -65,22 +65,27 @@ def do_shot(video, output, height=50, window=2.0, threshold=1.0):
 
     shots = Shot(video, height=height, context=window, threshold=threshold)
     shots = Timeline(shots)
-    dump(shots, output)
+    with open(output, 'w') as fp:
+        pyannote.core.json.dump(shots, fp)
 
 def do_thread(video, shots, output, min_match=20, lookahead=24, verbose=False):
 
-    shots = load(shots)
+    with open(shots, 'r') as fp:
+        shots = pyannote.core.json.load(fp)
     threads = Thread(video, shot=shots, lookahead=lookahead,
                      min_match=min_match, verbose=verbose)
     threads = threads()
-    dump(threads, output)
+    with open(output, 'w') as fp:
+        pyannote.core.json.dump(threads, fp)
 
 def do_scene(video, threads, output, verbose=False):
 
-    threads = load(threads)
+    with open(threads, 'r') as fp:
+        threads = pyannote.core.json.load(fp)
     raise NotImplementedError('Not yet available')
     # scenes = Scene(video, thread=threads, verbose=verbose)
-    # dump(scenes, output)
+    # with open(output, 'w') as fp:
+    #     pyannote.core.json.dump(scenes, fp)
 
 
 if __name__ == '__main__':
