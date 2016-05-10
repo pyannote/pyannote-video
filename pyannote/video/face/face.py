@@ -79,7 +79,7 @@ OUTER_EYES_AND_NOSE = np.array([36, 45, 33])
 
 class Face(object):
     """Face processing"""
-    def __init__(self, landmarks=None, openface=None, size=96):
+    def __init__(self, landmarks=None, openface=None, size=96, torch='th'):
         """Face detection
 
         Parameters
@@ -105,7 +105,7 @@ class Face(object):
         self._landmarks = MINMAX_TEMPLATE * self.size
 
         if openface is not None:
-            self._net = TorchWrap(model=openface, size=self.size, cuda=False)
+            self._net = TorchWrap(torch=torch, model=openface, size=self.size, cuda=False)
 
     # face detection
 
