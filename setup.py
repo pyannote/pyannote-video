@@ -46,7 +46,7 @@ setup(
     ],
     install_requires=[
         'pyannote.core >= 0.6.1',
-        'pyannote.algorithms >= 0.5',
+        'pyannote.algorithms >= 0.6.1',
         'numpy >= 1.8',
         'docopt >= 0.6.2',
         'tqdm >= 2.0.0',
@@ -69,7 +69,10 @@ setup(
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
+        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
         "Topic :: Scientific/Engineering"
     ],
