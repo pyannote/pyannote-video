@@ -1,3 +1,2 @@
 include versioneer.py
 include pyannote/video/_version.py
-include pyannote/video/face/openface_server.lua
