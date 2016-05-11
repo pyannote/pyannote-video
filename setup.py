@@ -35,10 +35,6 @@ setup(
     # package
     namespace_packages=['pyannote'],
     packages=find_packages(),
-    package_data={
-        'pyannote.video': ['pyannote/video/face/openface_server.lua']
-    },
-    include_package_data=True,
     scripts=[
         "scripts/pyannote-structure.py",
         "scripts/pyannote-face.py"

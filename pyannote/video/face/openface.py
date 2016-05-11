@@ -29,14 +29,14 @@ class TorchWrap(object):
     #   https://github.com/cmusatyalab/openface/issues/1
     #   https://github.com/cmusatyalab/openface/issues/4
 
-    def __init__(self, torch='/root/torch/install/bin/th',
+    def __init__(self, torch='th',
                  model='nn4.v2.t7', size=96, cuda=False):
 
         super(TorchWrap, self).__init__()
 
         luaFile = os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
-            'openface_server.lua')
+            'openface_server.lua.py')
 
         self.cmd = [torch, luaFile, '-model', model, '-imgDim', str(size)]
 
