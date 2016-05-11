@@ -1,4 +1,4 @@
-### Version 1.3.4 (2016-05-11)
+### Version 1.3.5 (2016-05-11)
 
   - fix: remove hard-coded path to torch
   - fix: corner case with iterable shorter than lookahead
