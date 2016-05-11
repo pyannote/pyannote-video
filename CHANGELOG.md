@@ -1,8 +1,9 @@
-### Version 1.3.3 (2016-05-11)
+### Version 1.3.4 (2016-05-11)
 
   - fix: remove hard-coded path to torch
   - fix: corner case with iterable shorter than lookahead
   - setup: update pyannote.algorithms dependency
+  - fix: include openface_server.lua in package
 
 ### Version 1.3.1 (2016-03-25)
 

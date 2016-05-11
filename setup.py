@@ -35,10 +35,6 @@ setup(
     # package
     namespace_packages=['pyannote'],
     packages=find_packages(),
-    package_data={
-        'pyannote.video': [
-        ]
-    },
     include_package_data=True,
     scripts=[
         "scripts/pyannote-structure.py",
