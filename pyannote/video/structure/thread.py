@@ -45,19 +45,35 @@ except Exception as e:
     # Python 2
     from ..utils.lru_cache import lru_cache
 
+
 def product_lookahead(iterable, lookahead):
 
     cache = deque([], lookahead + 1)
-    for item in iterable:
-        cache.append(item)
 
+    for item in iterable:
+
+        # fill cache with up to 'lookahead + 1' items
+        cache.append(item)
         if len(cache) < lookahead + 1:
             continue
 
+        # iterate over lookahead pairs (*)
         for j in range(lookahead):
             yield cache[0], cache[j+1]
 
-    cache.popleft()
+    # if cache is full, it means that the (*) part of the above loop
+    # was executed and we should therefore not yield (cache[0], ...) pairs
+    # a second time -- and thus remove cache[0] first.
+
+    # reciprocally, if cache is not full, it means that the (*) part of the
+    # above loop was never executed and we should therefore yield all possible
+    # pairs, including (cach[0], ...) pairs -- and thus we do **not** remove
+    # cache[0]
+
+    if len(cache) == lookahead + 1:
+        cache.popleft()
+
+    # exhaust the cache with standard itertools combinations
     for item1, item2 in combinations(cache, 2):
         yield item1, item2
 
