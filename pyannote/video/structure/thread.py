@@ -176,30 +176,30 @@ class Thread(object):
 
         """
 
+        shot = list(self.shot)
+
         # 10-frames collar
         collar = 10. / self.video.frame_rate
 
         # build threading graph by comparing each shot
         # to 'lookahead' following shots
         threads = nx.Graph()
+        threads.add_nodes_from(shot)
 
-        generator = product_lookahead(self.shot, self.lookahead)
+        generator = product_lookahead(shot, self.lookahead)
         if self.verbose:
             generator = tqdm(iterable=generator,
-                             total=len(self.shot) * self.lookahead,
+                             total=len(shot) * self.lookahead,
                              leave=True, mininterval=1.,
                              unit='shot pairs', unit_scale=True)
 
-        following = None
         for current, following in generator:
             orbLast = self._compute_orb(current.end - collar)
             orbFirst = self._compute_orb(following.start + collar)
-            threads.add_node(current)
             n_matches = self._match(orbLast, orbFirst)
             if n_matches > self.min_match:
                 threads.add_edge(current, following, n_matches=n_matches)
-        if following is not None:
-            threads.add_node(following)
+
         return threads
 
     def __call__(self):
