@@ -1,4 +1,4 @@
-### Version 1.3.7 (2016-05-12)
+### Version 1.3.8 (2016-05-12)
 
   - fix: corner case in one-shot threading
 
