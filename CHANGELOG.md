@@ -1,3 +1,7 @@
+### Version 1.3.7 (2016-05-12)
+
+  - fix: corner case in one-shot threading
+
 ### Version 1.3.6 (2016-05-11)
 
   - fix: remove hard-coded path to torch
