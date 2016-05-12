@@ -190,6 +190,7 @@ class Thread(object):
                              leave=True, mininterval=1.,
                              unit='shot pairs', unit_scale=True)
 
+        following = None
         for current, following in generator:
             orbLast = self._compute_orb(current.end - collar)
             orbFirst = self._compute_orb(following.start + collar)
@@ -197,7 +198,8 @@ class Thread(object):
             n_matches = self._match(orbLast, orbFirst)
             if n_matches > self.min_match:
                 threads.add_edge(current, following, n_matches=n_matches)
-        threads.add_node(following)
+        if following is not None:
+            threads.add_node(following)
         return threads
 
     def __call__(self):
