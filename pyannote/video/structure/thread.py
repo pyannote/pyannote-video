@@ -35,6 +35,7 @@ from pyannote.core import Annotation
 from pyannote.core.time import _t_iter as getLabelGenerator
 from tqdm import tqdm
 import warnings
+from pyannote.core.util import pairwise
 
 OPENCV = int(cv2.__version__.split('.')[0])
 
@@ -218,3 +219,30 @@ class Thread(object):
                 annotation[shot] = label
 
         return annotation.smooth()
+
+    def scenes(self, threads):
+
+        g = nx.Graph()
+
+        # connect adjacent shots
+        for shot1, shot2 in pairwise(threads.itertracks()):
+            g.add_edge(shot1, shot2)
+
+        # connect threaded shots
+        for label in threads.labels():
+            for shot1, shot2 in pairwise(threads.subset([label]).itertracks()):
+                g.add_edge(shot1, shot2)
+
+        scenes = threads.copy()
+
+        # group all shots of intertwined threads
+        for shots in sorted(sorted(bc) for bc in nx.biconnected_components(g)):
+
+            if len(shots) < 3:
+                continue
+
+            common_label = scenes[shots[0]]
+            for shot in shots:
+                scenes[shot] = common_label
+
+        return scenes
