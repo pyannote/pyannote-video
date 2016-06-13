@@ -1,3 +1,7 @@
+### Version 1.3.9 (2016-06-13)
+
+  - fix: include openface_server.lua in package
+
 ### Version 1.3.8 (2016-05-12)
 
   - fix: corner case in one-shot threading
