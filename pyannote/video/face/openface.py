@@ -36,7 +36,7 @@ class TorchWrap(object):
 
         luaFile = os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
-            'openface_server.lua.py')
+            'openface_server.lua')
 
         self.cmd = [torch, luaFile, '-model', model, '-imgDim', str(size)]
 
