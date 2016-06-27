@@ -43,7 +43,7 @@ setup(
         "scripts/pyannote-face.py"
     ],
     install_requires=[
-        'pyannote.core >= 0.6.5',
+        'pyannote.core >= 0.6.6',
         'pyannote.algorithms >= 0.6.4',
         'numpy >= 1.8',
         'docopt >= 0.6.2',
@@ -59,7 +59,7 @@ setup(
     # PyPI
     name='pyannote.video',
     description=('PyAnnote video processing'),
-    author='Hervé Bredin',
+    author='Herve Bredin',
     author_email='bredin@limsi.fr',
     url='http://herve.niderb.fr/',
     classifiers=[
