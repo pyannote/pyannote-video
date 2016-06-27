@@ -1,3 +1,9 @@
+### Version 1.3.10 (2016-06-27)
+
+  - setup: switch to pyannote.core 0.6.6
+  - feat: add --torch parameter to pyannote-face.py script
+  - feat: pseudo-scenes segmentation based on shot threads
+
 ### Version 1.3.9 (2016-06-13)
 
   - fix: include openface_server.lua in package
