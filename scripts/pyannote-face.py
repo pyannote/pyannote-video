@@ -77,6 +77,7 @@ Openface feature extraction options (features):
   <model>                   Path to Openface feature extraction model.
   <landmarks>               Path to facial landmarks detection result file.
   <output>                  Path to facial landmarks detection result file.
+  --torch=<path>            Path to torch [default: 'th'].
 
 Visualization options (demo):
 
@@ -307,10 +308,10 @@ def landmark(video, model, tracking, output):
 
             foutput.flush()
 
-def features(video, model, shape, output):
+def features(video, model, shape, output, torch='th'):
     """Openface FaceNet feature extraction"""
 
-    face = Face(size=96, openface=model)
+    face = Face(size=96, openface=model, torch=torch)
 
     # shape generator
     frame_width, frame_height = video.frame_size
@@ -482,7 +483,8 @@ if __name__ == '__main__':
         model = arguments['<model>']
         shape = arguments['<landmark>']
         output = arguments['<output>']
-        features(video, model, shape, output)
+        torch = arguments['--torch']
+        features(video, model, shape, output, torch=torch)
 
     if arguments['demo']:
 
