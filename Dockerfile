@@ -2,10 +2,11 @@ FROM bamos/ubuntu-opencv-dlib-torch:ubuntu_14.04-opencv_2.4.11-dlib_18.16-torch_
 MAINTAINER Hervé Bredin <bredin@limsi.fr>
 
 # python package management
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
+RUN apt-get update
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends --fix-missing --force-yes\
     python \
     python-dev \
-    python-pip
+    python-pip=1.5.4-1
 
 # scientific python
 RUN pip install numpy
@@ -14,7 +15,7 @@ RUN pip install jupyter
 RUN pip install matplotlib
 
 # pyannote.core notebook support
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends --fix-missing --force-yes\
     graphviz \
     libgraphviz-dev
 RUN pip install pyannote.core[notebook]
@@ -22,7 +23,7 @@ RUN pip install pyannote.core[notebook]
 # pyannote.video ffmpeg
 RUN add-apt-repository ppa:mc3man/trusty-media
 RUN apt-get update
-RUN apt-get install -yq ffmpeg
+RUN apt-get install -yq --fix-missing --force-yes ffmpeg
 
 RUN pip install pyannote.video
 
