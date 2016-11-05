@@ -1,3 +1,8 @@
+### Version 1.3.12 (2016-11-05)
+
+  - fix: fix Docker build (@yaochx)
+  - fix: fix getting started guide (@yaochx)
+
 ### Version 1.3.11 (2016-06-27)
 
   - setup: switch to pyannote.core 0.6.6

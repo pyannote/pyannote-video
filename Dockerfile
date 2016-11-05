@@ -2,10 +2,10 @@ FROM bamos/ubuntu-opencv-dlib-torch:ubuntu_14.04-opencv_2.4.11-dlib_18.16-torch_
 MAINTAINER Hervé Bredin <bredin@limsi.fr>
 
 # python package management
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
+RUN DEBIAN_FRONTEND=noninteractive apt-get install --force-yes -yq --no-install-recommends \
     python \
     python-dev \
-    python-pip
+    python-pip=1.5.4-1
 
 # scientific python
 RUN pip install numpy
@@ -14,7 +14,7 @@ RUN pip install jupyter
 RUN pip install matplotlib
 
 # pyannote.core notebook support
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
+RUN DEBIAN_FRONTEND=noninteractive apt-get install --force-yes -yq --no-install-recommends \
     graphviz \
     libgraphviz-dev
 RUN pip install pyannote.core[notebook]
