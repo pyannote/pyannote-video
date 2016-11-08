@@ -8,6 +8,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install --force-yes -yq --no-install-
     python-pip=1.5.4-1
 
 # scientific python
+RUN pip install -U pip
 RUN pip install numpy
 RUN pip install scipy
 RUN pip install jupyter
