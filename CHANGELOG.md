@@ -1,6 +1,7 @@
 ### Version 1.3.13 (2016-11-08)
 
   - fix: fix Docker build using latest pip version
+  - setup: switch to pyannote.algorithms 0.6.6
 
 ### Version 1.3.12 (2016-11-05)
 
