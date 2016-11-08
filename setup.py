@@ -44,7 +44,7 @@ setup(
     ],
     install_requires=[
         'pyannote.core >= 0.8',
-        'pyannote.algorithms >= 0.6.5',
+        'pyannote.algorithms >= 0.6.6',
         'numpy >= 1.8',
         'docopt >= 0.6.2',
         'tqdm >= 2.0.0',
