@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 
-# Copyright (c) 2015-2016 CNRS
+# Copyright (c) 2015-2017 CNRS
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -30,16 +30,27 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import itertools
+import numpy as np
+from sortedcollections import ValueSortedDict
+
+from pandas import read_table
+from pyannote.core import Segment, Annotation
+
 from pyannote.algorithms.clustering.hac import \
     HierarchicalAgglomerativeClustering
 from pyannote.algorithms.clustering.hac.model import HACModel
 from pyannote.algorithms.clustering.hac.stop import DistanceThreshold
 from pyannote.algorithms.clustering.hac.constraint import DoNotCooccur
+
 from scipy.spatial.distance import euclidean, pdist, cdist, squareform
-from pandas import read_table
-from pyannote.core import Segment, Annotation
-import numpy as np
-from xarray import DataArray
+
+def l2_normalize(fX):
+
+    norm = np.sqrt(np.sum(fX ** 2, axis=1))
+    norm[norm == 0] = 1.
+    return (fX.T / norm).T
+
 
 
 class _Model(HACModel):
@@ -89,34 +100,64 @@ class _Model(HACModel):
         X = np.vstack(X)
 
         n = len(X)
-        x = X.mean(axis=0)
+        x = np.average(X, axis=0)
 
         return (x, n)
 
     def compute_merged_model(self, clusters, parent=None):
+
         X, N = zip(*[self[cluster] for cluster in clusters])
+
         x = np.average(X, axis=0, weights=N)
         n = np.sum(N)
+
         return (x, n)
 
-    def compute_distance_matrix(self, parent=None):
-        clusters = list(self._models)
-        X = np.vstack([self[cluster][0] for cluster in clusters])
-        return DataArray(
-            squareform(pdist(X, 'euclidean')),
-            [('i', clusters), ('j', clusters)])
+    def compute_similarity_matrix(self, parent=None):
 
-    def compute_distances(self, cluster, clusters, dim='i', parent=None):
+        clusters = list(self._models)
+        n_clusters = len(clusters)
+
+        X = np.vstack([self[cluster][0] for cluster in clusters])
+
+        nX = l2_normalize(X)
+        similarities = -squareform(pdist(X, metric='euclidean'))
+
+        matrix = ValueSortedDict()
+        for i, j in itertools.combinations(range(n_clusters), 2):
+            matrix[clusters[i], clusters[j]] = similarities[i, j]
+            matrix[clusters[j], clusters[i]] = similarities[j, i]
+
+        return matrix
+
+    def compute_similarities(self, cluster, clusters, parent=None):
+
         x = self[cluster][0].reshape((1, -1))
         X = np.vstack([self[c][0] for c in clusters])
-        return DataArray(
-            cdist(x, X, metric='euclidean').reshape((-1, )),
-            [(dim, clusters)])
 
-    def compute_distance(self, cluster1, cluster2, parent=None):
+        # L2 normalization
+        nx = l2_normalize(x)
+        nX = l2_normalize(X)
+
+        similarities = -cdist(nx, nX, metric='euclidean')
+
+        matrix = ValueSortedDict()
+        for i, cluster_ in enumerate(clusters):
+            matrix[cluster, cluster_] = similarities[0, i]
+            matrix[cluster_, cluster] = similarities[0, i]
+
+        return matrix
+
+    def compute_similarity(self, cluster1, cluster2, parent=None):
+
         x1, _ = self[cluster1]
         x2, _ = self[cluster2]
-        return euclidean(x1, x2)
+
+        nx1 = l2_normalize(x1)
+        nx2 = l2_normalize(x2)
+
+        similarities = -cdist([nx1], [nx2], metric='euclidean')
+        return similarities[0, 0]
 
 
 class FaceClustering(HierarchicalAgglomerativeClustering):
