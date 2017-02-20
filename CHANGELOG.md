@@ -1,3 +1,12 @@
+### Version 1.4 (2017-02-20)
+
+  - fix: fix face clustering
+  - fix: fix support for latest numpy
+  - fix: fix Docker build
+  - setup: switch to pyannote.core 0.13
+  - setup: switch to pyannote.algorithms 0.7.3
+  - setup: switch to dlib 19.1.0
+
 ### Version 1.3.13 (2016-11-08)
 
   - fix: fix Docker build using latest pip version

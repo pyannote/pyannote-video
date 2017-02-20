@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 
-# Copyright (c) 2015-2016 CNRS
+# Copyright (c) 2015-2017 CNRS
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -90,8 +90,8 @@ class Shot(object):
 
         for x, y in itertools.product(range(width), range(height)):
             dy, dx = flow[y, x]
-            rx = max(0, min(x + dx, width - 1))
-            ry = max(0, min(y + dy, height - 1))
+            rx = int(max(0, min(x + dx, width - 1)))
+            ry = int(max(0, min(y + dy, height - 1)))
             self._reconstruct[y, x] = current[ry, rx]
 
         return np.mean(np.abs(previous - self._reconstruct))

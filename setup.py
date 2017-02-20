@@ -43,12 +43,12 @@ setup(
         "scripts/pyannote-face.py"
     ],
     install_requires=[
-        'pyannote.core >= 0.8',
-        'pyannote.algorithms >= 0.6.6',
+        'pyannote.core >= 0.13',
+        'pyannote.algorithms >= 0.7.3',
         'numpy >= 1.8',
         'docopt >= 0.6.2',
         'tqdm >= 2.0.0',
-        'dlib == 18.17.100',
+        'dlib >= 19.1.0',
         'munkres >= 1.0.7',
         'moviepy == 0.2.2.11'
     ],

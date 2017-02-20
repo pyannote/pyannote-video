@@ -11,8 +11,6 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install --force-yes -yq --no-install-
 RUN pip install -U pip
 RUN pip install numpy
 RUN pip install scipy
-RUN pip install jupyter
-RUN pip install matplotlib
 
 # pyannote.core notebook support
 RUN DEBIAN_FRONTEND=noninteractive apt-get install --force-yes -yq --no-install-recommends \
