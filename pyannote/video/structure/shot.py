@@ -59,7 +59,7 @@ class Shot(object):
 
         # estimate new size from video size and target height
         w, h = self.video._size
-        self._resize = (self.height, w * self.height / h)
+        self._resize = (self.height, int(w * self.height / h))
 
         # estimate kernel size from context and video step
         kernel_size = self.context / self.video.step
