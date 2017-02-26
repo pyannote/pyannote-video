@@ -280,7 +280,7 @@ def extract(video, landmark_model, embedding_model, tracking, landmark_output, e
     face = Face(landmarks=landmark_model,
                 embedding=embedding_model)
 
-    with open(landmark_output, 'w') as flandmark,
+    with open(landmark_output, 'w') as flandmark, \
          open(embedding_output, 'w') as fembedding:
 
         for timestamp, rgb in video:
@@ -451,9 +451,9 @@ if __name__ == '__main__':
         landmark_model = arguments['<landmark_model>']
         embedding_model = arguments['<embedding_model>']
         landmarks = arguments['<landmarks>']
-        embeddings = arguments['<embedding>']
+        embeddings = arguments['<embeddings>']
         extract(video, landmark_model, embedding_model, tracking,
-                landmark_output, embedding_output)
+                landmarks, embeddings)
 
 
     if arguments['demo']:
