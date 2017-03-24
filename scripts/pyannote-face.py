@@ -445,7 +445,7 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
     if t_end is None:
         t_end = video.duration
 
-    clip.subclip(t_start, t_end).write_videofile(output, fps=video.frame_rate)
+    clip.subclip(t_start, t_end).write_videofile(output, fps=video.frame_rate,audio_codec = 'aac')
 
 if __name__ == '__main__':
 
