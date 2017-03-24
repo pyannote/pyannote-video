@@ -397,12 +397,11 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
             # Draw face landmarks
             # Check if a landmark exists in index i
             if landmark and (i < len(landmarks)):
-                #points = landmarks[i][0].parts()
                 _, points = landmarks[i]
 
                 # Draw face landmark bounding box in white
                 box_color = (255, 255, 255)
-                left, right, top, bottom = create_bounding_box(points)
+                left, top, right, bottom = create_bounding_box(points)
                 landmark_pt1 = (int(left), int(top))
                 landmark_pt2 = (int(right), int(bottom))
                 cv2.rectangle(frame, landmark_pt1, landmark_pt2,box_color , 2)
