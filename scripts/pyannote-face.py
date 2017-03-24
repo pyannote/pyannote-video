@@ -400,16 +400,15 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
                 _, points = landmarks[i]
 
                 # Draw face landmark bounding box in white
-                box_color = (255, 255, 255)
+                landmark_color = (255, 255, 255)
                 left, top, right, bottom = create_bounding_box(points)
                 landmark_pt1 = (int(left), int(top))
                 landmark_pt2 = (int(right), int(bottom))
-                cv2.rectangle(frame, landmark_pt1, landmark_pt2,box_color , 2)
+                cv2.rectangle(frame, landmark_pt1, landmark_pt2,landmark_color , 2)
 
-                #Draw nose
-                pt1 = (int(points[27, 0]), int(points[27, 1]))
-                pt2 = (int(points[33, 0]), int(points[33, 1]))
-                cv2.line(frame, pt1, pt2, color, 1)
+                #Draw all face points
+                for point in points:
+                    cv2.circle(frame, center = (int(point[0]),int(point[1])), radius =1 ,color= landmark_color,thickness = -1)
 
         return frame
 
