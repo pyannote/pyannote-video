@@ -397,7 +397,8 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
             # Draw face landmarks
             # Check if a landmark exists in index i
             if landmark and (i < len(landmarks)):
-                points = landmarks[i][0].parts()
+                #points = landmarks[i][0].parts()
+                _, points = landmarks[i]
 
                 # Draw face landmark bounding box in white
                 box_color = (255, 255, 255)
