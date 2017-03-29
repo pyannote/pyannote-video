@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 
-# Copyright (c) 2015-2016 CNRS
+# Copyright (c) 2015-2017 CNRS
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -35,20 +35,17 @@ setup(
     # package
     namespace_packages=['pyannote'],
     packages=find_packages(),
-    package_data={
-        'pyannote.video': ['face/openface_server.lua'],
-    },
     scripts=[
         "scripts/pyannote-structure.py",
         "scripts/pyannote-face.py"
     ],
     install_requires=[
-        'pyannote.core >= 0.13',
+        'pyannote.core >= 0.13.2',
         'pyannote.algorithms >= 0.7.3',
         'numpy >= 1.8',
         'docopt >= 0.6.2',
         'tqdm >= 2.0.0',
-        'dlib >= 19.1.0',
+        'dlib == 19.4.0',
         'munkres >= 1.0.7',
         'moviepy == 0.2.2.11'
     ],

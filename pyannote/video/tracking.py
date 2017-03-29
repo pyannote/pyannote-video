@@ -160,7 +160,7 @@ class TrackingByDetection(object):
         overlap_area = np.zeros((n, n))
 
         # list of (identifier, tracker) tuple
-        trackers_ = trackers.items()
+        trackers_ = list(trackers.items())
         for t, (identifier, tracker) in enumerate(trackers_):
             position = tracker.get_position()
             for d, detection in enumerate(detections):
@@ -303,10 +303,10 @@ class TrackingByDetection(object):
         # build graph where nodes are tracks and where matching tracks
         # less than "track_max_gap" away are connected
         graph = nx.Graph()
-        for i in xrange(len(tracks)):
+        for i in range(len(tracks)):
             graph.add_node(i)
 
-        for i, j in itertools.combinations(xrange(len(tracks)), 2):
+        for i, j in itertools.combinations(range(len(tracks)), 2):
 
             # only try to match tracks with a short gap between them
             ti = tracks[i][-1][0]

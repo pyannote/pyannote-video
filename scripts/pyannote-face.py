@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 
-# Copyright (c) 2015-2016 CNRS
+# Copyright (c) 2015-2017 CNRS
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -30,12 +30,11 @@
 
 The standard pipeline is the following
 
-      face tracking => facial landmarks detection => feature extraction
+      face tracking => feature extraction => face clustering
 
 Usage:
-  pyannote-face track [options] <video> <shot.json> <output>
-  pyannote-face landmarks [options] <video> <model> <tracking> <output>
-  pyannote-face features [options] <video> <model> <landmark> <output>
+  pyannote-face track [options] <video> <shot.json> <tracking>
+  pyannote-face extract [options] <video> <tracking> <landmark_model> <embedding_model> <landmarks> <embeddings>
   pyannote-face demo [options] <video> <tracking> <output>
   pyannote-face (-h | --help)
   pyannote-face --version
@@ -50,7 +49,7 @@ Face tracking options (track):
 
   <video>                   Path to video file.
   <shot.json>               Path to shot segmentation result file.
-  <output>                  Path to tracking result file.
+  <tracking>                Path to tracking result file.
 
   --min-size=<ratio>        Approximate size (in video height ratio) of the
                             smallest face that should be detected. Default is
@@ -64,20 +63,14 @@ Face tracking options (track):
   --max-gap=<float>         Bridge gaps with duration shorter than <float>
                             [default: 1.].
 
-Facial landmarks detection options (landmarks):
+Feature extraction options (features):
 
   <video>                   Path to video file.
-  <model>                   Path to dlib facial landmark detection model.
   <tracking>                Path to tracking result file.
-  <output>                  Path to facial landmarks detection result file.
-
-Openface feature extraction options (features):
-
-  <video>                   Path to video file.
-  <model>                   Path to Openface feature extraction model.
+  <landmark_model>          Path to dlib facial landmark detection model.
+  <embedding_model>         Path to dlib feature extraction model.
   <landmarks>               Path to facial landmarks detection result file.
-  <output>                  Path to facial landmarks detection result file.
-  --torch=<path>            Path to torch [default: 'th'].
+  <embeddings>              Path to feature extraction result file.
 
 Visualization options (demo):
 
@@ -274,7 +267,7 @@ def track(video, shot, output,
 
             foutput.flush()
 
-def landmark(video, model, tracking, output):
+def extract(video, landmark_model, embedding_model, tracking, landmark_output, embedding_output):
     """Facial features detection"""
 
     # face generator
@@ -284,9 +277,11 @@ def landmark(video, model, tracking, output):
                                      double=False)
     faceGenerator.send(None)
 
-    face = Face(landmarks=model)
+    face = Face(landmarks=landmark_model,
+                embedding=embedding_model)
 
-    with open(output, 'w') as foutput:
+    with open(landmark_output, 'w') as flandmark, \
+         open(embedding_output, 'w') as fembedding:
 
         for timestamp, rgb in video:
 
@@ -295,48 +290,28 @@ def landmark(video, model, tracking, output):
             # not that T might be differ slightly from t
             # due to different steps in frame iteration
 
-            for identifier, boundingBox, _ in faces:
+            for identifier, bounding_box, _ in faces:
 
-                landmarks = face._get_landmarks(rgb, boundingBox)
+                landmarks = face.get_landmarks(rgb, bounding_box)
+                embedding = face.get_embedding(rgb, landmarks)
 
-                foutput.write('{t:.3f} {identifier:d}'.format(
+                flandmark.write('{t:.3f} {identifier:d}'.format(
                     t=T, identifier=identifier))
-                for x, y in landmarks:
-                    foutput.write(' {x:.5f} {y:.5f}'.format(x=x / frame_width,
+                for p in landmarks.parts():
+                    x, y = p.x, p.y
+                    flandmark.write(' {x:.5f} {y:.5f}'.format(x=x / frame_width,
                                                             y=y / frame_height))
-                foutput.write('\n')
+                flandmark.write('\n')
 
-            foutput.flush()
-
-def features(video, model, shape, output, torch='th'):
-    """Openface FaceNet feature extraction"""
-
-    face = Face(size=96, openface=model, torch=torch)
-
-    # shape generator
-    frame_width, frame_height = video.frame_size
-    landmarkGenerator = getLandmarkGenerator(shape, frame_width, frame_height)
-    landmarkGenerator.send(None)
-
-    with open(output, 'w') as foutput:
-
-        for timestamp, rgb in video:
-
-            T, shapes = landmarkGenerator.send(timestamp)
-
-            for identifier, landmarks in shapes:
-                normalized_rgb = face._get_normalized(rgb, landmarks)
-                normalized_bgr = cv2.cvtColor(normalized_rgb,
-                                              cv2.COLOR_BGR2RGB)
-                openface = face._get_openface(normalized_bgr)
-
-                foutput.write('{t:.3f} {identifier:d}'.format(
+                fembedding.write('{t:.3f} {identifier:d}'.format(
                     t=T, identifier=identifier))
-                for x in openface:
-                    foutput.write(' {x:.5f}'.format(x=x))
-                foutput.write('\n')
+                for x in embedding:
+                    fembedding.write(' {x:.5f}'.format(x=x))
+                fembedding.write('\n')
 
-            foutput.flush()
+            flandmark.flush()
+            fembedding.flush()
+
 
 def get_make_frame(video, tracking, landmark=None, labels=None,
                    height=200, shift=0.0):
@@ -398,7 +373,7 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
 
             # Draw nose
             if landmark:
-                _, points = landmarks[i]
+                points = landmarks[i][0].parts()
                 pt1 = (int(points[27, 0]), int(points[27, 1]))
                 pt2 = (int(points[33, 0]), int(points[33, 1]))
                 cv2.line(frame, pt1, pt2, color, 1)
@@ -456,13 +431,13 @@ if __name__ == '__main__':
     if arguments['track']:
 
         shot = arguments['<shot.json>']
-        output = arguments['<output>']
+        tracking = arguments['<tracking>']
         detect_min_size = float(arguments['--min-size'])
         detect_every = float(arguments['--every'])
         track_min_overlap_ratio = float(arguments['--min-overlap'])
         track_min_confidence = float(arguments['--min-confidence'])
         track_max_gap = float(arguments['--max-gap'])
-        track(video, shot, output,
+        track(video, shot, tracking,
               detect_min_size=detect_min_size,
               detect_every=detect_every,
               track_min_overlap_ratio=track_min_overlap_ratio,
@@ -470,21 +445,16 @@ if __name__ == '__main__':
               track_max_gap=track_max_gap)
 
     # facial features detection
-    if arguments['landmarks']:
+    if arguments['extract']:
 
         tracking = arguments['<tracking>']
-        model = arguments['<model>']
-        output = arguments['<output>']
-        landmark(video, model, tracking, output)
+        landmark_model = arguments['<landmark_model>']
+        embedding_model = arguments['<embedding_model>']
+        landmarks = arguments['<landmarks>']
+        embeddings = arguments['<embeddings>']
+        extract(video, landmark_model, embedding_model, tracking,
+                landmarks, embeddings)
 
-    # openface features extraction
-    if arguments['features']:
-
-        model = arguments['<model>']
-        shape = arguments['<landmark>']
-        output = arguments['<output>']
-        torch = arguments['--torch']
-        features(video, model, shape, output, torch=torch)
 
     if arguments['demo']:
 
