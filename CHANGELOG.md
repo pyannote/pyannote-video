@@ -1,3 +1,9 @@
+### Version 1.5 (2017-03-29)
+
+  - feat: switch from Openface to dlib
+  - fix: fix Python 3 support
+  - doc: update 'Getting started' notebook
+
 ### Version 1.4 (2017-02-20)
 
   - fix: fix face clustering
