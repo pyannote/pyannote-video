@@ -84,7 +84,7 @@ Visualization options (demo):
   --shift=<sec>             Shift result files by <sec> seconds [default: 0].
   --landmark=<path>         Path to facial landmarks detection result file.
   --label=<path>            Path to track identification result file.
-  --talking-face=<boolean>  If set to "True": Draw thick facetrack bounding box around the current talking face.
+  --talking-face            If set to "True": Draw thick facetrack bounding box around the current talking face.
 
 """
 
@@ -313,7 +313,7 @@ def extract(video, landmark_model, embedding_model, tracking, landmark_output, e
 
 
 def get_make_frame(video, tracking, landmark=None, labels=None,
-                   height=200, shift=0.0,talking_face=None):
+                   height=200, shift=0.0,talking_face=False):
 
     COLORS = [
         (240, 163, 255), (  0, 117, 220), (153,  63,   0), ( 76,   0,  92),
@@ -397,7 +397,7 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
 
 
 def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
-         labels=None, landmark=None, height=200, talking_face=None):
+         labels=None, landmark=None, height=200, talking_face=False):
 
     # parse label file
     if labels is not None:
@@ -491,8 +491,7 @@ if __name__ == '__main__':
         height = int(arguments['--height'])
 
         talking_face = arguments['--talking-face']
-        if not talking_face:
-            talking_face = None
+
 
         demo(filename, tracking, output,
              t_start=t_start, t_end=t_end,
