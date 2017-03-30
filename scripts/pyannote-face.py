@@ -314,7 +314,7 @@ def extract(video, landmark_model, embedding_model, tracking, landmark_output, e
 
 
 def get_make_frame(video, tracking, landmark=None, labels=None,
-                   height=200, shift=0.0,talking_face=False):
+                   height=200, shift=0.0, talking_face=False):
 
     COLORS = [
         (240, 163, 255), (  0, 117, 220), (153,  63,   0), ( 76,   0,  92),
@@ -351,14 +351,14 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
 
         cv2.putText(frame, '{t:.3f}'.format(t=t), (10, height-10),
                     cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1, 8, False)
-        for i, (identifier, face, status) in enumerate(faces):
+        for i, (identifier, face, is_talking) in enumerate(faces):
             identifier = int(identifier)
             color = COLORS[identifier % len(COLORS)]
 
             thickness = 2
-            # Draw talking-face annotation if exists
-            if (talking_face and status):
-                #If "talking-face" argument is true and the status=1 i.e the person is speaking: draw a thicker bounding box
+            
+            # Use thicker bounding boxes for talking faces
+            if talking_face and is_talking:
                 thickness = 10
 
             # Draw face bounding box
@@ -414,7 +414,8 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
     from moviepy.editor import VideoClip, AudioFileClip
 
     make_frame = get_make_frame(video, tracking, landmark=landmark,
-                                labels=labels, height=height, shift=shift, talking_face=talking_face)
+                                labels=labels, height=height, shift=shift, 
+                                talking_face=talking_face)
     video_clip = VideoClip(make_frame, duration=video.duration)
     audio_clip = AudioFileClip(filename)
     clip = video_clip.set_audio(audio_clip)
