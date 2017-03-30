@@ -358,8 +358,7 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
             thickness = 2
             # Draw talking-face annotation if exists
             if (talking_face and status):
-                #If "talking-face" argument is true and the status=1 i.e the person is speaking:
-                #   draw a thicker bounding box
+                #If "talking-face" argument is true and the status=1 i.e the person is speaking: draw a thicker bounding box
                 thickness = 10
 
             # Draw face bounding box
