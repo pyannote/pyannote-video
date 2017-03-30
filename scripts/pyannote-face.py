@@ -84,7 +84,7 @@ Visualization options (demo):
   --shift=<sec>             Shift result files by <sec> seconds [default: 0].
   --landmark=<path>         Path to facial landmarks detection result file.
   --label=<path>            Path to track identification result file.
-  --talking-face            If set to "True": Draw thick facetrack bounding box around the current talking face.
+  --talking-face            If added: Draw thick facetrack bounding box around the current talking face.
 
 """
 
