@@ -84,8 +84,9 @@ Visualization options (demo):
   --shift=<sec>             Shift result files by <sec> seconds [default: 0].
   --landmark=<path>         Path to facial landmarks detection result file.
   --label=<path>            Path to track identification result file.
-  --talking-face            If added: Draw thick facetrack bounding box around the current talking face.
-
+  --talking-face            Show the current talking face using a thicker bounding box.
+                            This assumes that the last field of <tracking> file is 1
+                            for talking, and 0 otherwise.
 """
 
 from __future__ import division
