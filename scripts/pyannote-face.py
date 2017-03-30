@@ -84,7 +84,7 @@ Visualization options (demo):
   --shift=<sec>             Shift result files by <sec> seconds [default: 0].
   --landmark=<path>         Path to facial landmarks detection result file.
   --label=<path>            Path to track identification result file.
-  --talking-face=<boolean>            Boolean to set talking face sprite drawing on the frame
+  --talking-face=<boolean>  If set to "True": Draw thick facetrack bounding box around the current talking face.
 
 """
 
@@ -178,30 +178,6 @@ def pairwise(iterable):
     "s -> (s0,s1), (s2,s3), (s4, s5), ..."
     a = iter(iterable)
     return zip(a, a)
-
-###################################################################################
-# Function to create bounding box from any set of points
-###################################################################################
-def create_bounding_box(polygon_points):
-
-    left, top, right, bottom = 999., 999., 0., 0.
-
-    for point in polygon_points:
-
-        #process for width
-        if (point[0] < left ):
-            left = point[0]
-        if (point[0] > right):
-            right = point[0]
-
-        # process for height
-        if (point[1] < top):
-            top = point[1]
-        if (point[1] > bottom):
-            bottom = point[1]
-
-    #return as: left, top, right, bottom to be compatible
-    return left, top, right, bottom
 
 def getLandmarkGenerator(shape, frame_width, frame_height):
     """Parse precomputed shape file and generate timestamped shapes"""
@@ -380,8 +356,10 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
             color = COLORS[identifier % len(COLORS)]
 
             thickness = 2
-            # Draw talking-face annotation of exists
+            # Draw talking-face annotation if exists
             if (talking_face and status):
+                #If "talking-face" argument is true and the status=1 i.e the person is speaking:
+                #   draw a thicker bounding box
                 thickness = 10
 
             # Draw face bounding box
@@ -408,10 +386,6 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
 
                 # Draw face landmark bounding box in white
                 landmark_color = (255, 255, 255)
-                left, top, right, bottom = create_bounding_box(points)
-                landmark_pt1 = (int(left), int(top))
-                landmark_pt2 = (int(right), int(bottom))
-                cv2.rectangle(frame, landmark_pt1, landmark_pt2,landmark_color , 2)
 
                 #Draw all face points
                 for point in points:
@@ -451,7 +425,7 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
     if t_end is None:
         t_end = video.duration
 
-    clip.subclip(t_start, t_end).write_videofile(output, fps=video.frame_rate,audio_codec = 'aac')
+    clip.subclip(t_start, t_end).write_videofile(output, fps=video.frame_rate)#,audio_codec = 'aac')
 
 if __name__ == '__main__':
 
@@ -519,7 +493,6 @@ if __name__ == '__main__':
         talking_face = arguments['--talking-face']
         if not talking_face:
             talking_face = None
-        print(talking_face)
 
         demo(filename, tracking, output,
              t_start=t_start, t_end=t_end,
