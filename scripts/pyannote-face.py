@@ -425,7 +425,7 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
     if t_end is None:
         t_end = video.duration
 
-    clip.subclip(t_start, t_end).write_videofile(output, fps=video.frame_rate)#,audio_codec = 'aac')
+    clip.subclip(t_start, t_end).write_videofile(output, fps=video.frame_rate)
 
 if __name__ == '__main__':
 
@@ -491,7 +491,6 @@ if __name__ == '__main__':
         height = int(arguments['--height'])
 
         talking_face = arguments['--talking-face']
-
 
         demo(filename, tracking, output,
              t_start=t_start, t_end=t_end,
