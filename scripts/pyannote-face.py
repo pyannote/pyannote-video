@@ -326,6 +326,8 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
         (255, 255,   0), (255,  80,   5)
     ]
 
+    LANDMARK_COLOR = (255, 255, 255)
+
     video_width, video_height = video.size
     ratio = height / video_height
     width = int(ratio * video_width)
@@ -381,12 +383,9 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
             # Draw face landmarks
             # Check if a landmark exists in index i
             if landmark and (i < len(landmarks)):
-                _, points = landmarks[i]
-                # Draw face landmark bounding box in white
-                landmark_color = (255, 255, 255)
-                #Draw all face points
-                for point in points:
-                    cv2.circle(frame, center = (int(point[0]),int(point[1])), radius =1 ,color= landmark_color,thickness = -1)
+                for point in landmarks[i][1]:
+                    cv2.circle(frame, center=(int(point[0]), int(point[1])), 
+                               radius=1, color=LANDMARK_COLOR, thickness=-1)
 
         return frame
 
