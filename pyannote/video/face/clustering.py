@@ -72,7 +72,7 @@ class _Model(HACModel):
             names += ['d{0}'.format(i)]
         data = read_table(embedding, delim_whitespace=True,
                           header=None, names=names)
-        data.sort_values(columns=['track', 'time'], inplace=True)
+        data.sort_values(by=['track', 'time'], inplace=True)
         starting_point = Annotation(modality='face')
         for track, segment in data.groupby('track').apply(self._to_segment).iteritems():
             if not segment:
