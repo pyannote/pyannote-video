@@ -1,3 +1,10 @@
+### Version 1.5.1 (2017-08-09)
+
+  - fix: use latest pandas API (@crhan & @epratheeban)
+  - fix: use latest moviepy (@crhan)
+  - doc: update README
+  - setup: use latest pyannote.core
+
 ### Version 1.5 (2017-03-29)
 
   - feat: switch from Openface to dlib
