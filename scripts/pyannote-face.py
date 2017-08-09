@@ -84,7 +84,9 @@ Visualization options (demo):
   --shift=<sec>             Shift result files by <sec> seconds [default: 0].
   --landmark=<path>         Path to facial landmarks detection result file.
   --label=<path>            Path to track identification result file.
-
+  --talking-face            Show the current talking face using a thicker bounding box.
+                            This assumes that the last field of <tracking> file is 1
+                            for talking, and 0 otherwise.
 """
 
 from __future__ import division
@@ -106,7 +108,6 @@ import numpy as np
 import cv2
 
 import dlib
-
 
 MIN_OVERLAP_RATIO = 0.5
 MIN_CONFIDENCE = 10.
@@ -178,7 +179,6 @@ def pairwise(iterable):
     "s -> (s0,s1), (s2,s3), (s4, s5), ..."
     a = iter(iterable)
     return zip(a, a)
-
 
 def getLandmarkGenerator(shape, frame_width, frame_height):
     """Parse precomputed shape file and generate timestamped shapes"""
@@ -314,7 +314,7 @@ def extract(video, landmark_model, embedding_model, tracking, landmark_output, e
 
 
 def get_make_frame(video, tracking, landmark=None, labels=None,
-                   height=200, shift=0.0):
+                   height=200, shift=0.0, talking_face=False):
 
     COLORS = [
         (240, 163, 255), (  0, 117, 220), (153,  63,   0), ( 76,   0,  92),
@@ -325,6 +325,8 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
         (224, 255, 102), (116,  10, 255), (153,   0,   0), (255, 255, 128),
         (255, 255,   0), (255,  80,   5)
     ]
+
+    LANDMARK_COLOR = (255, 255, 255)
 
     video_width, video_height = video.size
     ratio = height / video_height
@@ -351,13 +353,20 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
 
         cv2.putText(frame, '{t:.3f}'.format(t=t), (10, height-10),
                     cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1, 8, False)
-        for i, (identifier, face, _) in enumerate(faces):
+        for i, (identifier, face, is_talking) in enumerate(faces):
+            identifier = int(identifier)
             color = COLORS[identifier % len(COLORS)]
+
+            thickness = 2
+            
+            # Use thicker bounding boxes for talking faces
+            if talking_face and is_talking:
+                thickness = 10
 
             # Draw face bounding box
             pt1 = (int(face.left()), int(face.top()))
             pt2 = (int(face.right()), int(face.bottom()))
-            cv2.rectangle(frame, pt1, pt2, color, 2)
+            cv2.rectangle(frame, pt1, pt2, color, thickness)
 
             # Print tracker identifier
             cv2.putText(frame, '#{identifier:d}'.format(identifier=identifier),
@@ -371,12 +380,12 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
                         (pt1[0], pt1[1] - 7), cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, (255, 0, 0), 1, 8, False)
 
-            # Draw nose
-            if landmark:
-                points = landmarks[i][0].parts()
-                pt1 = (int(points[27, 0]), int(points[27, 1]))
-                pt2 = (int(points[33, 0]), int(points[33, 1]))
-                cv2.line(frame, pt1, pt2, color, 1)
+            # Draw face landmarks
+            # Check if a landmark exists in index i
+            if landmark and (i < len(landmarks)):
+                for point in landmarks[i][1]:
+                    cv2.circle(frame, center=(int(point[0]), int(point[1])), 
+                               radius=1, color=LANDMARK_COLOR, thickness=-1)
 
         return frame
 
@@ -384,7 +393,7 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
 
 
 def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
-         labels=None, landmark=None, height=200):
+         labels=None, landmark=None, height=200, talking_face=False):
 
     # parse label file
     if labels is not None:
@@ -404,7 +413,8 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
     from moviepy.editor import VideoClip, AudioFileClip
 
     make_frame = get_make_frame(video, tracking, landmark=landmark,
-                                labels=labels, height=height, shift=shift)
+                                labels=labels, height=height, shift=shift, 
+                                talking_face=talking_face)
     video_clip = VideoClip(make_frame, duration=video.duration)
     audio_clip = AudioFileClip(filename)
     clip = video_clip.set_audio(audio_clip)
@@ -477,7 +487,9 @@ if __name__ == '__main__':
 
         height = int(arguments['--height'])
 
+        talking_face = arguments['--talking-face']
+
         demo(filename, tracking, output,
              t_start=t_start, t_end=t_end,
              landmark=landmark, height=height,
-             shift=shift, labels=labels)
+             shift=shift, labels=labels, talking_face=talking_face)
