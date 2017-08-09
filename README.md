@@ -4,4 +4,48 @@ Open [Phd/postdoc positions](https://mycore.core-cloud.net/public.php?service=fi
 
 # pyannote-video
 
-[Getting started](http://nbviewer.ipython.org/github/pyannote/pyannote-video/blob/master/doc/getting_started.ipynb)
+> a toolkit for face detection, tracking, and clustering in videos
+
+## Installation
+
+Create a new `conda` environment:
+
+```bash
+$ conda create -n pyannote python=3.5 anaconda
+$ source activate pyannote
+```
+
+Install `pyannote-video` and its dependencies:
+
+```bash
+$ conda install cmake
+$ conda install gcc
+$ conda install -c menpo ffmpeg=3.1.3
+$ conda install opencv
+$ conda install boost
+$ pip install pyannote-video
+```
+
+Download `dlib` models:
+
+```bash
+$ git clone https://github.com/pyannote/pyannote-data.git
+$ git clone https://github.com/davisking/dlib-models.git
+$ bunzip2 dlib-models/dlib_face_recognition_resnet_model_v1.dat.bz2
+$ bunzip2 dlib-models/shape_predictor_68_face_landmarks.dat.bz2
+```
+
+## Tutorial
+
+To execute the ["Getting started"](http://nbviewer.ipython.org/github/pyannote/pyannote-video/blob/master/doc/getting_started.ipynb) notebook locally, download the example video and `pyannote.video` source code:
+
+```bash
+$ git clone https://github.com/pyannote/pyannote-data.git
+$ git clone https://github.com/pyannote/pyannote-video.git
+$ pip install jupyter
+$ jupyter notebook --notebook-dir="pyannote-video/doc"
+```
+
+## Documentation
+
+No proper documentation for the time being...
