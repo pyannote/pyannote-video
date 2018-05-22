@@ -19,8 +19,6 @@ $ source activate pyannote
 Install `pyannote-video` and its dependencies:
 
 ```bash
-$ conda install cmake
-$ conda install opencv
 $ pip install pyannote-video
 ```
 
