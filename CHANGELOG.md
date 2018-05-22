@@ -1,3 +1,10 @@
+### Version 1.6 (2018-05-22)
+
+  - improve: simplify installation (latest dlib, pip's opencv-python, & ffmpeg from imageio)
+  - fix: switch to pyannote.algorithms 0.8
+  - fix: fix shot theading
+  - doc: update "Getting started" guide
+
 ### Version 1.5.1 (2017-08-09)
 
   - fix: use latest pandas API (@crhan & @epratheeban)
