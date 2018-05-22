@@ -384,7 +384,7 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
 
 
 def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
-         labels=None, landmark=None, height=200):
+         labels=None, landmark=None, height=200, ffmpeg=None):
 
     # parse label file
     if labels is not None:
@@ -397,9 +397,9 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
 
     video = Video(filename)
 
-    import os
-    os.environ['IMAGEIO_FFMPEG_EXE'] = 'ffmpeg'
-    # from moviepy.video.io.VideoFileClip import VideoFileClip
+    if ffmpeg is not None:
+        import os
+        os.environ['IMAGEIO_FFMPEG_EXE'] = ffmpeg
 
     from moviepy.editor import VideoClip, AudioFileClip
 

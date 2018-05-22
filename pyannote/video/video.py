@@ -94,7 +94,7 @@ def _cvsecs(time):
 class Video(object):
 
     def __init__(self, filename, start=None, end=None, step=None,
-                 ffmpeg='ffmpeg', verbose=False):
+                 ffmpeg=None, verbose=False):
         """
         Parameters
         ----------
@@ -110,11 +110,21 @@ class Video(object):
         verbose : bool, optional
             Show a progress bar while iterating the video. Defaults to False.
         ffmpeg : str, optional
-            Path to ffmpeg command line tool. Defaults to "ffmpeg".
+            Path to ffmpeg command line tool. Defaults to the one downloaded
+            by imageio.
         """
 
         self.filename = filename
+
+        if ffmpeg is None:
+            import imageio
+            try:
+                ffmpeg = imageio.plugins.ffmpeg.get_exe()
+            except imageio.plugins.ffmpeg.NeedDownloadError as e:
+                imageio.plugins.ffmpeg.download()
+                ffmpeg = imageio.plugins.ffmpeg.get_exe()
         self.ffmpeg = ffmpeg
+
         self.verbose = verbose
 
         infos = self._parse_infos(print_infos=False, check_duration=True)
@@ -155,7 +165,7 @@ class Video(object):
     def frame_rate(self):
         """Video frame rate"""
         return self._fps
-    
+
     @property
     def size(self):
         """Video size (width, height) in pixels"""

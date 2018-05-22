@@ -20,9 +20,7 @@ Install `pyannote-video` and its dependencies:
 
 ```bash
 $ conda install cmake
-$ conda install -c menpo ffmpeg=3.1.3
 $ conda install opencv
-$ conda install boost
 $ pip install pyannote-video
 ```
 
