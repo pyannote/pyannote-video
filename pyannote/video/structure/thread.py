@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 
-# Copyright (c) 2015-2016 CNRS
+# Copyright (c) 2015-2018 CNRS
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,8 @@ from pyannote.core.time import _t_iter as getLabelGenerator
 from tqdm import tqdm
 import warnings
 from pyannote.core.util import pairwise
+from .shot import Shot
+
 
 OPENCV = int(cv2.__version__.split('.')[0])
 
@@ -102,7 +104,7 @@ class Thread(object):
 
         # estimate new size from video size and target height
         w, h = self.video._size
-        self._resize = (self.height, w * self.height / h)
+        self._resize = (int(self.height), int(w * self.height / h))
 
         self.lookahead = lookahead
         if shot is None:

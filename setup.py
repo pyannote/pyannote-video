@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 
-# Copyright (c) 2015-2017 CNRS
+# Copyright (c) 2015-2018 CNRS
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -40,14 +40,15 @@ setup(
         "scripts/pyannote-face.py"
     ],
     install_requires=[
-        'pyannote.core >= 1.0.4',
-        'pyannote.algorithms >= 0.7.3',
+        'pyannote.core >= 1.3.1',
+        'pyannote.algorithms >= 0.8',
         'numpy >= 1.8',
         'docopt >= 0.6.2',
-        'tqdm >= 2.0.0',
-        'dlib == 19.4.0',
+        'tqdm >= 4.23.2',
+        'dlib == 19.12',
+        'opencv-python == 3.4.1.15',
         'munkres >= 1.0.7',
-        'moviepy >= 0.2.2.13',
+        'moviepy == 0.2.3.4',
         'pandas >= 0.20.3',
     ],
 

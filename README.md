@@ -1,7 +1,6 @@
 # Announcement
 
-Open [Phd/postdoc positions](https://mycore.core-cloud.net/public.php?service=files&t=2b5f5a79d24ac81c3b3c371fcd80734b) at [LIMSI](https://www.limsi.fr/en/) combining machine learning, NLP, speech processing, and computer vision. 
-
+Open [postdoc position](https://mycore.core-cloud.net/public.php?service=files&t=2b5f5a79d24ac81c3b3c371fcd80734b) at [LIMSI](https://www.limsi.fr/en/) combining machine learning, NLP, speech processing, and computer vision.
 
 # pyannote-video
 
@@ -12,17 +11,13 @@ Open [Phd/postdoc positions](https://mycore.core-cloud.net/public.php?service=fi
 Create a new `conda` environment:
 
 ```bash
-$ conda create -n pyannote python=3.5 anaconda
+$ conda create -n pyannote python=3.6 anaconda
 $ source activate pyannote
 ```
 
 Install `pyannote-video` and its dependencies:
 
 ```bash
-$ conda install cmake
-$ conda install -c menpo ffmpeg=3.1.3
-$ conda install opencv
-$ conda install boost
 $ pip install pyannote-video
 ```
 
