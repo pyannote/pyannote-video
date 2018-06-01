@@ -1,3 +1,7 @@
+### Version 1.6.1 (2018-06-01)
+
+  - fix: add missing "--ffmpeg" option to command line tools
+
 ### Version 1.6 (2018-05-22)
 
   - improve: simplify installation (latest dlib, pip's opencv-python, & ffmpeg from imageio)
