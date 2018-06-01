@@ -41,6 +41,7 @@ Usage:
 
 General options:
 
+  --ffmpeg=<ffmpeg>         Specify which `ffmpeg` to use.
   -h --help                 Show this screen.
   --version                 Show version.
   --verbose                 Show processing progress.
@@ -395,11 +396,7 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
                 identifier = int(identifier)
                 labels[identifier] = label
 
-    video = Video(filename)
-
-    if ffmpeg is not None:
-        import os
-        os.environ['IMAGEIO_FFMPEG_EXE'] = ffmpeg
+    video = Video(filename, ffmpeg=ffmpeg)
 
     from moviepy.editor import VideoClip, AudioFileClip
 
@@ -422,10 +419,11 @@ if __name__ == '__main__':
 
     # initialize video
     filename = arguments['<video>']
+    ffmpeg = arguments['--ffmpeg']
 
     verbose = arguments['--verbose']
 
-    video = Video(filename, verbose=verbose)
+    video = Video(filename, ffmpeg=ffmpeg, verbose=verbose)
 
     # face tracking
     if arguments['track']:
@@ -480,4 +478,4 @@ if __name__ == '__main__':
         demo(filename, tracking, output,
              t_start=t_start, t_end=t_end,
              landmark=landmark, height=height,
-             shift=shift, labels=labels)
+             shift=shift, labels=labels, ffmpeg=ffmpeg)
