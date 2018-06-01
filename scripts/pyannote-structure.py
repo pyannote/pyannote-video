@@ -41,6 +41,7 @@ Usage:
   pyannote-structure.py --version
 
 Options:
+  --ffmpeg=<ffmpeg>      Specify which `ffmpeg` to use.
   --height=<n_pixels>    Resize video frame to height <n_pixels> [default: 50].
   --window=<n_seconds>   Apply median filtering on <n_seconds> window [default: 2.0].
   --threshold=<value>    Set threshold to <value> [default: 1.0].
@@ -102,7 +103,9 @@ if __name__ == '__main__':
 
     # initialize video
     filename = arguments['<video>']
-    video = Video(filename, verbose=verbose)
+    ffmpeg = arguments['--ffmpeg']
+
+    video = Video(filename, ffmpeg=ffmpeg, verbose=verbose)
 
     if arguments['shot']:
         height = int(arguments['--height'])
