@@ -39,6 +39,6 @@ from .structure.thread import Thread
 # face processing
 from .face.face import Face
 from .face.tracking import FaceTracking
+from .face.clustering import FaceClustering
 
-
-__all__ = ['Video', 'Shot', 'Thread', 'Face', 'FaceTracking']
+__all__ = ['Video', 'Shot', 'Thread', 'Face', 'FaceTracking', 'FaceClustering']

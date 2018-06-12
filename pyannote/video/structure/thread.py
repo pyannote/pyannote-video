@@ -152,10 +152,9 @@ class Thread(object):
     def _match(self, orb1, orb2):
         """Check whether there is a match between orb1 and orb2"""
 
-        if orb1 is None or orb2 is None:
+        if orb1 is None or orb2 is None or len(orb1) < 2 or len(orb2) < 2:
             return False
 
-        # matches = self._bfmatcher.match(orb1, orb2)
         matches = self._flann.knnMatch(orb1, orb2, k=2)
 
         count = 0
