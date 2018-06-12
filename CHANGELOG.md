@@ -1,3 +1,9 @@
+### Version 1.6.2 (2018-06-12)
+
+ - setup: switch to pyannote.core 1.3.2 / sortedcollectoins 1.0.1
+ - fix: fix corner case with less than 2 ORB descriptors
+ - chore: add FaceClustering at pyannote.video root level
+
 ### Version 1.6.1 (2018-06-01)
 
   - fix: add missing "--ffmpeg" option to command line tools
