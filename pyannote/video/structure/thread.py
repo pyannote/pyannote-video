@@ -32,10 +32,10 @@ from itertools import combinations
 import cv2
 import networkx as nx
 from pyannote.core import Annotation
-from pyannote.core.time import _t_iter as getLabelGenerator
 from tqdm import tqdm
 import warnings
-from pyannote.core.util import pairwise
+from pyannote.core.utils.generators import pairwise
+from pyannote.core.utils.generators import string_generator
 from .shot import Shot
 
 
@@ -211,7 +211,7 @@ class Thread(object):
         threads = [sorted(cc) for cc in nx.connected_components(graph)]
 
         annotation = Annotation()
-        labelGenerator = getLabelGenerator()
+        labelGenerator = string_generator()
 
         # chronologically sorted threads (based on their first shot)
         for thread in sorted(threads, key=lambda thread: thread[0]):
