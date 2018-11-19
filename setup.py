@@ -40,7 +40,7 @@ setup(
         "scripts/pyannote-face.py"
     ],
     install_requires=[
-        'pyannote.core >= 1.3.2',
+        'pyannote.core >= 2.0',
         'pyannote.algorithms >= 0.8',
         'sortedcollections >= 1.0.1',
         'numpy >= 1.8',
@@ -67,11 +67,9 @@ setup(
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.4",
-        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
         "Topic :: Scientific/Engineering"
     ],
 )
