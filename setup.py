@@ -47,7 +47,7 @@ setup(
         'docopt >= 0.6.2',
         'tqdm >= 4.23.2',
         'dlib == 19.12',
-        'opencv-python == 3.4.1.15',
+        'opencv-python >= 3.4.1.15',
         'munkres >= 1.0.7',
         'moviepy == 0.2.3.4',
         'pandas >= 0.20.3',
