@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 
-# Copyright (c) 2015-2017 CNRS
+# Copyright (c) 2015-2019 CNRS
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -78,9 +78,11 @@ class Shot(object):
         if OPENCV == 2:
             flow = cv2.calcOpticalFlowFarneback(
                 previous, current, 0.5, 3, 15, 3, 5, 1.1, 0, flow)
-        elif OPENCV == 3:
+        elif OPENCV >= 3:
             flow = cv2.calcOpticalFlowFarneback(
                 previous, current, flow, 0.5, 3, 15, 3, 5, 1.1, 0)
+        else:
+            raise NotImplementedError("Not implemented for OpenCV {}".format(OPENCV))
 
         height, width = previous.shape
 
