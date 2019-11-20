@@ -64,3 +64,6 @@ pyannote-data/
 
 # dlib models
 dlib-models/
+
+#NFS
+.nfs*
