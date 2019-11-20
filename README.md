@@ -44,3 +44,19 @@ $ jupyter notebook --notebook-dir="pyannote-video/doc"
 ## Documentation
 
 No proper documentation for the time being...
+
+### Computed data format
+
+We use [NumPy structured arrays](https://docs.scipy.org/doc/numpy/user/basics.rec.html) to store :
+- bounding boxes formated as (left, top, right, bottom)
+- time in seconds where that face was tracked
+- status of the tracking algorithm, e.g. 'backward'
+- landmarks
+- embeddings
+
+File which should be named as `<file_uri>.npy`.
+
+
+Indexing anywhere in the array gives a different track.
+
+Each track is a structured array of shape `[('bbox', '<f8', (N, 4)), ('time', '<i8', (N,)), ('status', '<U21', (N,)), ('landmarks', '<f8', (N, XXX)), ('embeddings', '<f8', (N, 128))]` with `N` being the number of frames in the track.
