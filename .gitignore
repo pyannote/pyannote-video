@@ -57,4 +57,10 @@ docs/_build/
 target/
 
 # Ipython
-/doc/.ipynb_checkpoints/
+.ipynb_checkpoints/
+
+# Data
+pyannote-data/
+
+# dlib models
+dlib-models/
