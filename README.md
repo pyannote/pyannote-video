@@ -56,7 +56,15 @@ We use [NumPy structured arrays](https://docs.scipy.org/doc/numpy/user/basics.re
 
 File which should be named as `<file_uri>.npy`.
 
-
-Indexing anywhere in the array gives a different track.
-
-Each track is a structured array of shape `[('bbox', '<f8', (N, 4)), ('time', '<i8', (N,)), ('status', '<U21', (N,)), ('landmarks', '<f8', (N, XXX)), ('embeddings', '<f8', (N, 128))]` with `N` being the number of frames in the track.
+The array has shape/dtype:
+```py
+[
+  ('time', 'float64', (N,)),
+  ('track', 'int64', (N,)),
+  ('bbox', 'float64', (N, 4)),
+  ('status', '<U21', (N,)),
+  ('landmarks', 'float64', (N, XXX)),
+  ('embeddings', 'float64', (N, 128))
+]
+```
+with `N` being sum of the number of frames over every track.
