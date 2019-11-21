@@ -120,15 +120,9 @@ FACE_TEMPLATE = ('{t:.3f} {identifier:d} '
 
 def getFaceGenerator(tracking, frame_width, frame_height, double=True):
     """Parse precomputed face file and generate timestamped faces"""
-
-    # load tracking file and sort it by timestamp
-    names = ['t', 'track', 'left', 'top', 'right', 'bottom', 'status']
-    dtype = {'left': np.float32, 'top': np.float32,
-             'right': np.float32, 'bottom': np.float32}
-    tracking = read_table(tracking, delim_whitespace=True, header=None,
-                          names=names, dtype=dtype)
-    tracking = tracking.sort_values('t')
-
+    #print("hey i called getFaceGenerator")
+    tracking=np.load(tracking)
+    #print(tracking) OK
     # t is the time sent by the frame generator
     t = yield
 
@@ -136,13 +130,20 @@ def getFaceGenerator(tracking, frame_width, frame_height, double=True):
 
     faces = []
     currentT = None
-
-    for _, (T, identifier, left, top, right, bottom, status) in tracking.iterrows():
-
-        left = int(left * frame_width)
-        right = int(right * frame_width)
-        top = int(top * frame_height)
-        bottom = int(bottom * frame_height)
+    print("t:",t)
+    indexes=np.where(tracking["time"]==t)[0]
+    print("indexes:",indexes)
+    save_landmarks,save_embeddings=[],[]
+    for i in indexes:
+        T=tracking["time"][i]
+        status=tracking["status"][i]
+        identifier=tracking["track"][i]
+        left, top, right, bottom=tracking["bbox"][i]
+        print(left, top, right, bottom)
+        left*=frame_width
+        right*=frame_width
+        top*=frame_height
+        bottom*=frame_height
 
         face = rectangle(left, top, right, bottom)
 
@@ -243,7 +244,6 @@ def track(video, shot, output,
           track_min_confidence=MIN_CONFIDENCE,
           track_max_gap=MAX_GAP):
     """Tracking by detection"""
-
     tracking = FaceTracking(detect_min_size=detect_min_size,
                             detect_every=detect_every,
                             track_min_overlap_ratio=track_min_overlap_ratio,
@@ -256,17 +256,35 @@ def track(video, shot, output,
     if isinstance(shot, Annotation):
         shot = shot.get_timeline()
 
-    with open(output, 'w') as foutput:
-
-        for identifier, track in enumerate(tracking(video, shot)):
-
-            for t, (left, top, right, bottom), status in track:
-
-                foutput.write(FACE_TEMPLATE.format(
-                    t=t, identifier=identifier, status=status,
-                    left=left, right=right, top=top, bottom=bottom))
-
-            foutput.flush()
+    #time,identifiers,bbox,status=[],[],[],[]
+    tracks=[]
+    for identifier, track in enumerate(tracking(video, shot)):
+        for t, (left, top, right, bottom), s in track:
+            # time.append(t)
+            # identifiers.append(identifier)
+            # bbox.append((left, top, right, bottom))
+            # status.append(s)
+            tracks.append((
+                t,
+                identifier,
+                [left, top, right, bottom],
+                s
+            ))
+    N=len(tracks)
+    # print(len(tracks),len(tracks[0]))
+    # print(tracks[0])
+    #N=len(bbox)
+    tracks=np.array(
+        tracks,
+        #list(zip(time,identifiers,bbox,status)),
+        # dtype=[
+        #     ('time', 'float64', (N,)),
+        #     ('track', 'int64', (N,)),
+        #     ('bbox', 'float64', (N, 4)),
+        #     ('status', '<U21', (N,)),
+        # ]
+    )
+    np.save(output,tracks)
 
 def extract(video, landmark_model, embedding_model, tracking, landmark_output, embedding_output):
     """Facial features detection"""
@@ -280,7 +298,6 @@ def extract(video, landmark_model, embedding_model, tracking, landmark_output, e
 
     face = Face(landmarks=landmark_model,
                 embedding=embedding_model)
-
     with open(landmark_output, 'w') as flandmark, \
          open(embedding_output, 'w') as fembedding:
 
@@ -288,14 +305,22 @@ def extract(video, landmark_model, embedding_model, tracking, landmark_output, e
 
             # get all detected faces at this time
             T, faces = faceGenerator.send(timestamp)
-            # not that T might be differ slightly from t
+            # not that T might be differ slightly from timestamp
             # due to different steps in frame iteration
-
-            for identifier, bounding_box, _ in faces:
-
+            indexes=np.where(tracks["time"]==timestamp)[0]
+            #bbox=tracks["bbox"][indexes]
+            #identifier=tracks["track"][indexes]
+            save_landmarks,save_embeddings=[],[]
+            for i in indexes:
+                left, top, right, bottom=tracks["bbox"][i]
+                left*=frame_width
+                right*=frame_width
+                top*=frame_height
+                bottom*=frame_height
+                bbox=(left, top, right, bottom)
+                identifier=tracks["track"][i]
                 landmarks = face.get_landmarks(rgb, bounding_box)
                 embedding = face.get_embedding(rgb, landmarks)
-
                 flandmark.write('{t:.3f} {identifier:d}'.format(
                     t=T, identifier=identifier))
                 for p in landmarks.parts():
