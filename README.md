@@ -65,7 +65,7 @@ Each track has dtype :
   ('track', 'int64'),
   ('bbox', 'float64', (4,)),
   ('status', '<U21'),
-  ('landmarks', 'float64', (XXX,)),
+  ('landmarks', 'float64', (68,)),
   ('embeddings', 'float64', (128,))
 ]
 ```
