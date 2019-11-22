@@ -256,33 +256,33 @@ def track(video, shot, output,
     if isinstance(shot, Annotation):
         shot = shot.get_timeline()
 
-    #time,identifiers,bbox,status=[],[],[],[]
-    tracks=[]
+    time,identifiers,bbox,status=[],[],[],[]
+    #tracks=[]
     for identifier, track in enumerate(tracking(video, shot)):
         for t, (left, top, right, bottom), s in track:
-            # time.append(t)
-            # identifiers.append(identifier)
-            # bbox.append((left, top, right, bottom))
-            # status.append(s)
-            tracks.append((
-                t,
-                identifier,
-                [left, top, right, bottom],
-                s
-            ))
-    N=len(tracks)
+            time.append(t)
+            identifiers.append(identifier)
+            bbox.append((left, top, right, bottom))
+            status.append(s)
+            # tracks.append((
+            #     t,
+            #     identifier,
+            #     [left, top, right, bottom],
+            #     s
+            # ))
+    #N=len(tracks)
     # print(len(tracks),len(tracks[0]))
     # print(tracks[0])
-    #N=len(bbox)
+    N=len(bbox)
     tracks=np.array(
-        tracks,
-        #list(zip(time,identifiers,bbox,status)),
-        # dtype=[
-        #     ('time', 'float64', (N,)),
-        #     ('track', 'int64', (N,)),
-        #     ('bbox', 'float64', (N, 4)),
-        #     ('status', '<U21', (N,)),
-        # ]
+        #tracks,
+        (time,identifiers,bbox,status),
+        dtype=[
+            ('time', 'float64', (N,)),
+            ('track', 'int64', (N,)),
+            ('bbox', 'float64', (N, 4)),
+            ('status', '<U21', (N,)),
+        ]
     )
     np.save(output,tracks)
 
