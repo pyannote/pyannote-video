@@ -35,7 +35,7 @@ The standard pipeline is the following
 Usage:
   pyannote-face track [options] <video> <shot.json> <tracking>
   pyannote-face extract [options] <video> <tracking> <landmark_model> <embedding_model> <output>
-  pyannote-face demo [options] <video> <tracking> <output>
+  pyannote-face demo [options] <video> <precomputed> <output>
   pyannote-face (-h | --help)
   pyannote-face --version
 
@@ -70,20 +70,19 @@ Feature extraction options (features):
   <tracking>                Path to tracking result file.
   <landmark_model>          Path to dlib facial landmark detection model.
   <embedding_model>         Path to dlib feature extraction model.
-  <landmarks>               Path to facial landmarks detection result file.
-  <embeddings>              Path to feature extraction result file.
+  <output>                  Path to features result file.
 
 Visualization options (demo):
 
   <video>                   Path to video file.
-  <tracking>                Path to tracking result file.
+  <precomputed>             Path to the precomputed features file.
   <output>                  Path to demo video file.
 
   --height=<pixels>         Height of demo video file [default: 400].
   --from=<sec>              Encode demo from <sec> seconds [default: 0].
   --until=<sec>             Encode demo until <sec> seconds.
   --shift=<sec>             Shift result files by <sec> seconds [default: 0].
-  --landmark=<path>         Path to facial landmarks detection result file.
+  --yield_landmarks         Show landmarks in output video.
   --label=<path>            Path to track identification result file.
 
 """
@@ -100,9 +99,6 @@ from pyannote.video import Video
 from pyannote.video import Face
 from pyannote.video import FaceTracking
 
-from pandas import read_table
-
-from six.moves import zip
 import numpy as np
 import cv2
 
@@ -113,10 +109,6 @@ EMBEDDING_DIM=128
 MIN_OVERLAP_RATIO = 0.5
 MIN_CONFIDENCE = 10.
 MAX_GAP = 1.
-
-FACE_TEMPLATE = ('{t:.3f} {identifier:d} '
-                 '{left:.3f} {top:.3f} {right:.3f} {bottom:.3f} '
-                 '{status:s}\n')
 
 TRACK_DTYPE=[
     ('time', 'float64'),
@@ -142,27 +134,43 @@ def rectangle_to_bbox(rectangle,frame_width,frame_height):
     bottom/=frame_height
     return (left, top, right, bottom)
 
-def getFaceGenerator(tracking, frame_width, frame_height, double=True):
-    """Parse precomputed face file and generate timestamped faces"""
 
-    # load tracking file and sort it by timestamp
-    tracking = np.load(tracking)
-    tracking.sort(order='time')
+
+def getGenerator(precomputed, frame_width, frame_height,yield_landmarks=False, double=True):
+    """Parse precomputed face file and generate timestamped faces along with landmarks if yield_landmarks
+    Parameters:
+    -----------
+    precomputed: path to the precomputed file (np array, described in README)
+    frame_width, frame_height: self-explanatory
+    yield_landmarks: if True : yields landmarks, else, yields only bounding boxes
+        Defaults to False.
+    """
+
+    # load precomputed file and sort it by timestamp
+    precomputed = np.load(precomputed)
+    precomputed.sort(order='time')
 
     # t is the time sent by the frame generator
     t = yield
 
-
     faces = []
     currentT = None
 
-    for T, identifier, bbox, status in tracking:
-
+    for element in precomputed:
+        if yield_landmarks:
+            T, identifier, bbox, status,landmarks,_=element
+            landmarks[:, 0] = np.round(landmarks[:, 0] * frame_width)
+            landmarks[:, 1] = np.round(landmarks[:, 1] * frame_height)
+        else:
+            T, identifier, bbox, status=element
         face=bbox_to_rectangle(bbox,frame_width, frame_height,double)
 
         # load all faces from current frame and only those faces
         if T == currentT or currentT is None:
-            faces.append((identifier, face, status))
+            if yield_landmarks:
+                faces.append((identifier, face, status,landmarks))
+            else:
+                faces.append((identifier, face, status))
             currentT = T
             continue
 
@@ -181,68 +189,10 @@ def getFaceGenerator(tracking, frame_width, frame_height, double=True):
             t = yield currentT, faces
 
             # reset current time and corresponding faces
-            faces = [(identifier, face, status)]
-            currentT = T
-            break
-
-    while True:
-        t = yield t, []
-
-
-def pairwise(iterable):
-    "s -> (s0,s1), (s2,s3), (s4, s5), ..."
-    a = iter(iterable)
-    return zip(a, a)
-
-
-def getLandmarkGenerator(shape, frame_width, frame_height):
-    """Parse precomputed shape file and generate timestamped shapes"""
-
-    # load landmarks file
-    shape = read_table(shape, delim_whitespace=True, header=None)
-
-    # deduce number of landmarks from file dimension
-    _, d = shape.shape
-    n_points = (d - 2) / 2
-
-    # t is the time sent by the frame generator
-    t = yield
-
-    shapes = []
-    currentT = None
-
-    for _, row in shape.iterrows():
-
-        T = float(row[0])
-        identifier = int(row[1])
-        landmarks = np.float32(list(pairwise(
-            [coordinate for coordinate in row[2:]])))
-        landmarks[:, 0] = np.round(landmarks[:, 0] * frame_width)
-        landmarks[:, 1] = np.round(landmarks[:, 1] * frame_height)
-
-        # load all shapes from current frame
-        # and only those shapes
-        if T == currentT or currentT is None:
-            shapes.append((identifier, landmarks))
-            currentT = T
-            continue
-
-        # once all shapes at current time are loaded
-        # wait until t reaches current time
-        # then returns all shapes at once
-
-        while True:
-
-            # wait...
-            if currentT > t:
-                t = yield t, []
-                continue
-
-            # return all shapes at once
-            t = yield currentT, shapes
-
-            # reset current time and corresponding shapes
-            shapes = [(identifier, landmarks)]
+            if yield_landmarks:
+                faces = [(identifier, face, status,landmarks)]
+            else:
+                faces = [(identifier, face, status)]
             currentT = T
             break
 
@@ -288,8 +238,9 @@ def extract(video, landmark_model, embedding_model, tracking, output):
 
     # face generator
     frame_width, frame_height = video.frame_size
-    faceGenerator = getFaceGenerator(tracking,
+    faceGenerator = getGenerator(tracking,
                                      frame_width, frame_height,
+                                     yield_landmarks=False,
                                      double=False)
     faceGenerator.send(None)
     face = Face(landmarks=landmark_model,
@@ -330,7 +281,7 @@ def extract(video, landmark_model, embedding_model, tracking, output):
     )
     np.save(output,extracted)
 
-def get_make_frame(video, tracking, landmark=None, labels=None,
+def get_make_frame(video, precomputed,yield_landmarks=False, labels=None,
                    height=200, shift=0.0):
 
     COLORS = [
@@ -348,12 +299,10 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
     width = int(ratio * video_width)
     video.frame_size = (width, height)
 
-    faceGenerator = getFaceGenerator(tracking, width, height, double=True)
-    faceGenerator.send(None)
 
-    if landmark:
-        landmarkGenerator = getLandmarkGenerator(landmark, width, height)
-        landmarkGenerator.send(None)
+    generator=getGenerator(precomputed, width, height,
+        yield_landmarks=yield_landmarks, double=True)
+    generator.send(None)
 
     if labels is None:
         labels = dict()
@@ -361,14 +310,15 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
     def make_frame(t):
 
         frame = video(t)
-        _, faces = faceGenerator.send(t - shift)
-
-        if landmark:
-            _, landmarks = landmarkGenerator.send(t - shift)
+        _,faces = generator.send(t - shift)
 
         cv2.putText(frame, '{t:.3f}'.format(t=t), (10, height-10),
                     cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1, 8, False)
-        for i, (identifier, face, _) in enumerate(faces):
+        for i, element in enumerate(faces):
+            if yield_landmarks:
+                identifier, face, status,landmarks=element
+            else:
+                identifier, face, status=element
             color = COLORS[identifier % len(COLORS)]
 
             # Draw face bounding box
@@ -389,10 +339,9 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
                         0.5, (255, 0, 0), 1, 8, False)
 
             # Draw nose
-            if landmark:
-                points = landmarks[i][0].parts()
-                pt1 = (int(points[27, 0]), int(points[27, 1]))
-                pt2 = (int(points[33, 0]), int(points[33, 1]))
+            if yield_landmarks:
+                pt1 = (int(landmarks[27][0]), int(landmarks[27][1]))
+                pt2 = (int(landmarks[33][0]), int(landmarks[33][1]))
                 cv2.line(frame, pt1, pt2, color, 1)
 
         return frame
@@ -400,8 +349,8 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
     return make_frame
 
 
-def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
-         labels=None, landmark=None, height=200, ffmpeg=None):
+def demo(filename, precomputed, output, t_start=0., t_end=None, shift=0.,
+         labels=None, yield_landmarks=False, height=200, ffmpeg=None):
 
     # parse label file
     if labels is not None:
@@ -416,7 +365,7 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
 
     from moviepy.editor import VideoClip, AudioFileClip
 
-    make_frame = get_make_frame(video, tracking, landmark=landmark,
+    make_frame = get_make_frame(video, precomputed, yield_landmarks=yield_landmarks,
                                 labels=labels, height=height, shift=shift)
     video_clip = VideoClip(make_frame, duration=video.duration)
     audio_clip = AudioFileClip(filename)
@@ -470,7 +419,7 @@ if __name__ == '__main__':
 
     if arguments['demo']:
 
-        tracking = arguments['<tracking>']
+        precomputed = arguments['<precomputed>']
         output = arguments['<output>']
 
         t_start = float(arguments['--from'])
@@ -483,13 +432,11 @@ if __name__ == '__main__':
         if not labels:
             labels = None
 
-        landmark = arguments['--landmark']
-        if not landmark:
-            landmark = None
+        yield_landmarks = arguments['--yield_landmarks']
 
         height = int(arguments['--height'])
 
-        demo(filename, tracking, output,
+        demo(filename, precomputed, output,
              t_start=t_start, t_end=t_end,
-             landmark=landmark, height=height,
+             yield_landmarks=yield_landmarks, height=height,
              shift=shift, labels=labels, ffmpeg=ffmpeg)
