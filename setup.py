@@ -50,7 +50,8 @@ setup(
         'opencv-python == 3.4.1.15',
         'munkres >= 1.0.7',
         'moviepy == 0.2.3.4',
-        'pandas >= 0.20.3',
+        'pandas >= 0.20.3',        
+        'imageio == 2.4.1'
     ],
 
     version=versioneer.get_version(),
