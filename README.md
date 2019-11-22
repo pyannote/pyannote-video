@@ -49,6 +49,7 @@ No proper documentation for the time being...
 
 We use [NumPy structured arrays](https://docs.scipy.org/doc/numpy/user/basics.rec.html) to store :
 - bounding boxes formated as (left, top, right, bottom)
+- identifier for the track
 - time in seconds where that face was tracked
 - status of the tracking algorithm, e.g. 'backward'
 - landmarks
@@ -56,15 +57,15 @@ We use [NumPy structured arrays](https://docs.scipy.org/doc/numpy/user/basics.re
 
 File which should be named as `<file_uri>.npy`.
 
-The array has shape/dtype:
+The array has shape `(N,)`, with `N` being sum of the number of frames over every track.
+Each track has dtype :
 ```py
 [
-  ('time', 'float64', (N,)),
-  ('track', 'int64', (N,)),
-  ('bbox', 'float64', (N, 4)),
-  ('status', '<U21', (N,)),
-  ('landmarks', 'float64', (N, XXX)),
-  ('embeddings', 'float64', (N, 128))
+  ('time', 'float64'),
+  ('track', 'int64'),
+  ('bbox', 'float64', (4,)),
+  ('status', '<U21'),
+  ('landmarks', 'float64', (XXX,)),
+  ('embeddings', 'float64', (128,))
 ]
 ```
-with `N` being sum of the number of frames over every track.
