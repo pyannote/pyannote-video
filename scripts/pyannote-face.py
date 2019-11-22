@@ -131,49 +131,50 @@ def getFaceGenerator(tracking, frame_width, frame_height, double=True):
     faces = []
     currentT = None
     print("t:",t)
-    indexes=np.where(tracking["time"]==t)[0]
-    print("indexes:",indexes)
     save_landmarks,save_embeddings=[],[]
-    for i in indexes:
-        T=tracking["time"][i]
-        status=tracking["status"][i]
-        identifier=tracking["track"][i]
-        left, top, right, bottom=tracking["bbox"][i]
-        print(left, top, right, bottom)
-        left*=frame_width
-        right*=frame_width
-        top*=frame_height
-        bottom*=frame_height
+    for T in set(np.sort(tracking['time'])):
+        indexes=np.where(tracking["time"]==T)[0]
+        print("indexes:",indexes)
+        for i in indexes:
+            #T=tracking["time"][i]
+            status=tracking["status"][i]
+            identifier=tracking["track"][i]
+            left, top, right, bottom=tracking["bbox"][i]
+            print(left, top, right, bottom)
+            left*=frame_width
+            right*=frame_width
+            top*=frame_height
+            bottom*=frame_height
 
-        face = rectangle(left, top, right, bottom)
+            face = rectangle(left, top, right, bottom)
 
-        # load all faces from current frame and only those faces
-        if T == currentT or currentT is None:
-            faces.append((identifier, face, status))
-            currentT = T
-            continue
-
-        # once all faces at current time are loaded
-        # wait until t reaches current time
-        # then returns all faces at once
-
-        while True:
-
-            # wait...
-            if currentT > t:
-                t = yield t, []
+            # load all faces from current frame and only those faces
+            if T == currentT or currentT is None:
+                faces.append((identifier, face, status))
+                currentT = T
                 continue
 
-            # return all faces at once
-            t = yield currentT, faces
+            # once all faces at current time are loaded
+            # wait until t reaches current time
+            # then returns all faces at once
 
-            # reset current time and corresponding faces
-            faces = [(identifier, face, status)]
-            currentT = T
-            break
+            while True:
 
-    while True:
-        t = yield t, []
+                # wait...
+                if currentT > t:
+                    t = yield t, []
+                    continue
+
+                # return all faces at once
+                t = yield currentT, faces
+
+                # reset current time and corresponding faces
+                faces = [(identifier, face, status)]
+                currentT = T
+                break
+
+        while True:
+            t = yield t, []
 
 
 def pairwise(iterable):
@@ -285,17 +286,26 @@ def track(video, shot, output,
         ]
     )
     np.save(output,tracks)
-
+def get_indexes_at_t(array,timestamp):
+    return np.where(array["time"]==timestamp)[0]
+def get_rectangle(bbox,frame_width,frame_height):
+    left, top, right, bottom=bbox
+    left*=frame_width
+    right*=frame_width
+    top*=frame_height
+    bottom*=frame_height
+    rectangle=dlib.rectangle(int(left), int(top), int(right), int(bottom))
+    return rectangle
 def extract(video, landmark_model, embedding_model, tracking, landmark_output, embedding_output):
     """Facial features detection"""
 
     # face generator
     frame_width, frame_height = video.frame_size
-    faceGenerator = getFaceGenerator(tracking,
-                                     frame_width, frame_height,
-                                     double=False)
-    faceGenerator.send(None)
-
+    # faceGenerator = getFaceGenerator(tracking,
+    #                                  frame_width, frame_height,
+    #                                  double=False)
+    # faceGenerator.send(None)
+    tracks=np.load(tracking)
     face = Face(landmarks=landmark_model,
                 embedding=embedding_model)
     with open(landmark_output, 'w') as flandmark, \
@@ -304,22 +314,18 @@ def extract(video, landmark_model, embedding_model, tracking, landmark_output, e
         for timestamp, rgb in video:
 
             # get all detected faces at this time
-            T, faces = faceGenerator.send(timestamp)
+            #T, faces = faceGenerator.send(timestamp)
             # not that T might be differ slightly from timestamp
             # due to different steps in frame iteration
-            indexes=np.where(tracks["time"]==timestamp)[0]
+            indexes=get_indexes_at_t(tracks,timestamp)
             #bbox=tracks["bbox"][indexes]
             #identifier=tracks["track"][indexes]
             save_landmarks,save_embeddings=[],[]
             for i in indexes:
-                left, top, right, bottom=tracks["bbox"][i]
-                left*=frame_width
-                right*=frame_width
-                top*=frame_height
-                bottom*=frame_height
-                bbox=(left, top, right, bottom)
+                T=tracks["time"][i]
+                bbox=get_rectangle(tracks["bbox"][i],frame_width,frame_height)
                 identifier=tracks["track"][i]
-                landmarks = face.get_landmarks(rgb, bounding_box)
+                landmarks = face.get_landmarks(rgb, bbox)
                 embedding = face.get_embedding(rgb, landmarks)
                 flandmark.write('{t:.3f} {identifier:d}'.format(
                     t=T, identifier=identifier))
@@ -338,7 +344,16 @@ def extract(video, landmark_model, embedding_model, tracking, landmark_output, e
             flandmark.flush()
             fembedding.flush()
 
-
+def get_faces_at_t(tracks,t,frame_width,frame_height):
+    faces=[]
+    for i in get_indexes_at_t(tracks,t):
+        face=get_rectangle(tracks["bbox"][i],frame_width,frame_height)
+        faces.append((
+            tracks["track"][i],
+            face,
+            tracks["status"][i]
+        ))
+    return faces
 def get_make_frame(video, tracking, landmark=None, labels=None,
                    height=200, shift=0.0):
 
@@ -357,9 +372,9 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
     width = int(ratio * video_width)
     video.frame_size = (width, height)
 
-    faceGenerator = getFaceGenerator(tracking, width, height, double=True)
-    faceGenerator.send(None)
-
+    # faceGenerator = getFaceGenerator(tracking, width, height, double=True)
+    # faceGenerator.send(None)
+    tracks=np.load(tracking)
     if landmark:
         landmarkGenerator = getLandmarkGenerator(landmark, width, height)
         landmarkGenerator.send(None)
@@ -370,8 +385,8 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
     def make_frame(t):
 
         frame = video(t)
-        _, faces = faceGenerator.send(t - shift)
-
+        #_, faces = faceGenerator.send(t - shift)
+        faces=get_faces_at_t(tracks,t-shift,width,height)
         if landmark:
             _, landmarks = landmarkGenerator.send(t - shift)
 
