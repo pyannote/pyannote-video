@@ -156,13 +156,12 @@ def getGenerator(precomputed, frame_width, frame_height,yield_landmarks=False, d
     faces = []
     currentT = None
 
-    for element in precomputed:
+    for face in precomputed:
+        T, identifier, bbox, status=face['time'],face['track'],face['bbox'],face['status']
         if yield_landmarks:
-            T, identifier, bbox, status,landmarks,_=element
+            landmarks=face['landmarks']
             landmarks[:, 0] = np.round(landmarks[:, 0] * frame_width)
             landmarks[:, 1] = np.round(landmarks[:, 1] * frame_height)
-        else:
-            T, identifier, bbox, status=element
         face=bbox_to_rectangle(bbox,frame_width, frame_height,double)
 
         # load all faces from current frame and only those faces
