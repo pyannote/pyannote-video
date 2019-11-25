@@ -260,8 +260,9 @@ def extract_image(rgb,landmarks_model,embedding_model,output,
         Whether to save embedding. Defaults to False.
     """
     face = Face(landmarks=landmarks_model,embedding=embedding_model)
-    faces=[]
-    frame_height,frame_width, _=rgb.shape
+    faces=[]    
+    frame_height=rgb.shape[0]
+    frame_width=rgb.shape[1]
     for rectangle in face(rgb):
         bbox=rectangle_to_bbox(rectangle,frame_width,frame_height)
         result=(bbox,)
