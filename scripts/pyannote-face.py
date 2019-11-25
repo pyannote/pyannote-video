@@ -110,10 +110,13 @@ MIN_OVERLAP_RATIO = 0.5
 MIN_CONFIDENCE = 10.
 MAX_GAP = 1.
 
+LANDMARKS_DTYPE=('landmarks', 'float64', LANDMARKS_DIM)
+EMBEDDING_DTYPE=('embeddings', 'float64', (EMBEDDING_DIM,))
+BBOX_DTYPE=('bbox', 'float64', (4,))
 TRACK_DTYPE=[
     ('time', 'float64'),
     ('track', 'int64'),
-    ('bbox', 'float64', (4,)),
+    BBOX_DTYPE,
     ('status', '<U21'),
 ]
 
@@ -133,7 +136,12 @@ def rectangle_to_bbox(rectangle,frame_width,frame_height):
     right/=frame_width
     bottom/=frame_height
     return (left, top, right, bottom)
-
+def parts_to_landmarks(landmarks,frame_width,frame_height):
+    save_landmarks=[]
+    for p in landmarks.parts():
+        x, y = p.x, p.y
+        save_landmarks.append((x / frame_width, y / frame_height))
+    return save_landmarks
 
 
 def getGenerator(precomputed, frame_width, frame_height,yield_landmarks=False, double=True):
@@ -199,6 +207,7 @@ def getGenerator(precomputed, frame_width, frame_height,yield_landmarks=False, d
         t = yield t, []
 
 
+
 def track(video, shot, output,
           detect_min_size=0.0,
           detect_every=0.0,
@@ -232,8 +241,52 @@ def track(video, shot, output,
     )
     np.save(output,tracks)
 
+def extract_image(rgb,landmarks_model,embedding_model,output,
+                 return_landmarks=False,return_embedding=False):
+    """Facial features detection for a rgb image
+    Parameters
+    ----------
+    rgb : np.array
+        RGB image to be processed
+    landmarks : str
+        Path to dlib's 68 facial landmarks predictor model.
+    embedding : str
+        Path to dlib's face embedding model.
+    output : str
+        Path to features result file (should end with `.npy`).
+    return_landmarks : bool
+        Whether to save landmarks. Defaults to False.
+    return_embedding : bool
+        Whether to save embedding. Defaults to False.
+    """
+    face = Face(landmarks=landmarks_model,embedding=embedding_model)
+    faces=[]
+    frame_height,frame_width, _=rgb.shape
+    for rectangle in face(rgb):
+        bbox=rectangle_to_bbox(rectangle,frame_width,frame_height)
+        result=(bbox,)
+        if return_landmarks or return_embedding:
+            landmarks = face.get_landmarks(rgb, rectangle)
+            if return_landmarks:
+                landmarks=parts_to_landmarks(landmarks,frame_width,frame_height)
+                result+=(landmarks,)
+            if return_embedding:
+                embedding = face.get_embedding(rgb, landmarks)
+                result+=(embedding,)
+        faces.append(result)
+    face_dtype=[BBOX_DTYPE]
+    if return_landmarks:
+        face_dtype+=[LANDMARKS_DTYPE]
+    if return_embedding:
+        face_dtype+=[EMBEDDING_DTYPE]
+    faces=np.array(
+        faces,
+        dtype=face_dtype
+    )
+    np.save(output,faces)
+    
 def extract(video, landmark_model, embedding_model, tracking, output):
-    """Facial features detection"""
+    """Facial features detection for video"""
 
     # face generator
     frame_width, frame_height = video.frame_size
@@ -255,10 +308,7 @@ def extract(video, landmark_model, embedding_model, tracking, output):
 
             landmarks = face.get_landmarks(rgb, bounding_box)
             embedding = face.get_embedding(rgb, landmarks)
-            save_landmarks=[]
-            for p in landmarks.parts():
-                x, y = p.x, p.y
-                save_landmarks.append((x / frame_width, y / frame_height))
+            save_landmarks=parts_to_landmarks(landmarks,frame_width,frame_height)
             save_embedding=[]
             for x in embedding:
                 save_embedding.append(x)
@@ -274,8 +324,8 @@ def extract(video, landmark_model, embedding_model, tracking, output):
     extracted=np.array(
         save_extracted,
         dtype=TRACK_DTYPE+[
-          ('landmarks', 'float64', LANDMARKS_DIM),
-          ('embeddings', 'float64', (EMBEDDING_DIM,))
+          LANDMARKS_DTYPE,
+          EMBEDDING_DTYPE
         ]
     )
     np.save(output,extracted)
