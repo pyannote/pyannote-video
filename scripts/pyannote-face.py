@@ -98,6 +98,7 @@ from pyannote.video import __version__
 from pyannote.video import Video
 from pyannote.video import Face
 from pyannote.video import FaceTracking
+from pyannote.video.utils.scale_frame import bbox_to_rectangle, rectangle_to_bbox, parts_to_landmarks
 
 import numpy as np
 import cv2
@@ -120,28 +121,6 @@ TRACK_DTYPE=[
     ('status', '<U21'),
 ]
 
-def bbox_to_rectangle(bbox,frame_width,frame_height, double=True):
-    rectangle = dlib.drectangle if double else dlib.rectangle
-    left, top, right, bottom=bbox
-    left = int(left * frame_width)
-    right = int(right * frame_width)
-    top = int(top * frame_height)
-    bottom = int(bottom * frame_height)
-    face = rectangle(left, top, right, bottom)
-    return face
-def rectangle_to_bbox(rectangle,frame_width,frame_height):
-    left, top, right, bottom=rectangle.left(),rectangle.top(),rectangle.right(),rectangle.bottom()
-    left/=frame_width
-    top/=frame_height
-    right/=frame_width
-    bottom/=frame_height
-    return (left, top, right, bottom)
-def parts_to_landmarks(landmarks,frame_width,frame_height):
-    save_landmarks=[]
-    for p in landmarks.parts():
-        x, y = p.x, p.y
-        save_landmarks.append((x / frame_width, y / frame_height))
-    return save_landmarks
 
 
 def getGenerator(precomputed, frame_width, frame_height,yield_landmarks=False, double=True):
