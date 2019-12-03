@@ -28,6 +28,11 @@
 
 import dlib
 
+def scale_up_landmarks(landmarks,width,height):
+    landmarks[:, 0] = np.round(landmarks[:, 0] * width)
+    landmarks[:, 1] = np.round(landmarks[:, 1] * height)
+    return landmarks
+
 def scale_up_bbox(bbox,frame_width,frame_height):
     left, top, right, bottom=bbox
     left = int(left * frame_width)
