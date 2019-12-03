@@ -220,60 +220,12 @@ def track(video, shot, output,
     )
     np.save(output,tracks)
 
-def extract_image(rgb,landmarks_model,embedding_model,output,
-                 return_landmarks=False,return_embedding=False):
-    """Facial features detection for a rgb image
-    Parameters
-    ----------
-    rgb : np.array
-        RGB image to be processed
-    landmarks : str
-        Path to dlib's 68 facial landmarks predictor model.
-    embedding : str
-        Path to dlib's face embedding model.
-    output : str
-        Path to features result file (should end with `.npy`).
-    return_landmarks : bool
-        Whether to save landmarks. Defaults to False.
-    return_embedding : bool
-        Whether to save embedding. Defaults to False.
-    """
-    face = Face(landmarks=landmarks_model,embedding=embedding_model)
-    faces=[]    
-    frame_height=rgb.shape[0]
-    frame_width=rgb.shape[1]
-    for rectangle in face(rgb):
-        bbox=rectangle_to_bbox(rectangle,frame_width,frame_height)
-        result=(bbox,)
-        if return_landmarks or return_embedding:
-            landmarks = face.get_landmarks(rgb, rectangle)
-            if return_landmarks:
-                landmarks=parts_to_landmarks(landmarks,frame_width,frame_height)
-                result+=(landmarks,)
-            if return_embedding:
-                embedding = face.get_embedding(rgb, landmarks)
-                result+=(embedding,)
-        faces.append(result)
-    face_dtype=[BBOX_DTYPE]
-    if return_landmarks:
-        face_dtype+=[LANDMARKS_DTYPE]
-    if return_embedding:
-        face_dtype+=[EMBEDDING_DTYPE]
-    faces=np.array(
-        faces,
-        dtype=face_dtype
-    )
-    np.save(output,faces)
-    
 def extract(video, landmark_model, embedding_model, tracking, output):
     """Facial features detection for video"""
 
     # face generator
     frame_width, frame_height = video.frame_size
-    faceGenerator = getGenerator(tracking,
-                                     frame_width, frame_height,
-                                     yield_landmarks=False,
-                                     double=False)
+    faceGenerator = getGenerator(tracking)
     faceGenerator.send(None)
     face = Face(landmarks=landmark_model,
                 embedding=embedding_model)
