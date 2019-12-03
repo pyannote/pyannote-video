@@ -70,4 +70,4 @@ Each track has dtype :
 ]
 ```
 
-When using single rgb image, there's no tracking so each line of the array represents a different face (thus there's no 'time' nor 'track' nor 'status' field).
+When using single rgb image (implemented in pyannote.db.plumcot), there's no tracking so each line of the array represents a different face (thus there's no 'time' nor 'track' nor 'status' field).
