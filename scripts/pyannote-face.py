@@ -98,7 +98,7 @@ from pyannote.video import __version__
 from pyannote.video import Video
 from pyannote.video import Face
 from pyannote.video import FaceTracking
-from pyannote.video.utils.scale_frame import bbox_to_rectangle, rectangle_to_bbox, parts_to_landmarks
+from pyannote.video.utils.scale_frame import bbox_to_rectangle, rectangle_to_bbox, parts_to_landmarks,scale_up_landmarks
 
 import numpy as np
 import cv2
@@ -121,16 +121,8 @@ TRACK_DTYPE=[
     ('status', '<U21'),
 ]
 
-
-
-def getGenerator(precomputed, frame_width, frame_height,yield_landmarks=False, double=True):
-    """Parse precomputed face file and generate timestamped faces along with landmarks if yield_landmarks
-    Parameters:
-    -----------
-    precomputed: path to the precomputed file (np array, described in README)
-    frame_width, frame_height: self-explanatory
-    yield_landmarks: if True : yields landmarks, else, yields only bounding boxes
-        Defaults to False.
+def getGenerator(precomputed):
+    """Parse precomputed face file and generate timestamped faces
     """
 
     # load precomputed file and sort it by timestamp
@@ -144,19 +136,10 @@ def getGenerator(precomputed, frame_width, frame_height,yield_landmarks=False, d
     currentT = None
 
     for face in precomputed:
-        T, identifier, bbox, status=face['time'],face['track'],face['bbox'],face['status']
-        if yield_landmarks:
-            landmarks=face['landmarks']
-            landmarks[:, 0] = np.round(landmarks[:, 0] * frame_width)
-            landmarks[:, 1] = np.round(landmarks[:, 1] * frame_height)
-        face=bbox_to_rectangle(bbox,frame_width, frame_height,double)
-
+        T=face['time']
         # load all faces from current frame and only those faces
         if T == currentT or currentT is None:
-            if yield_landmarks:
-                faces.append((identifier, face, status,landmarks))
-            else:
-                faces.append((identifier, face, status))
+            faces.append(face)
             currentT = T
             continue
 
@@ -175,17 +158,12 @@ def getGenerator(precomputed, frame_width, frame_height,yield_landmarks=False, d
             t = yield currentT, faces
 
             # reset current time and corresponding faces
-            if yield_landmarks:
-                faces = [(identifier, face, status,landmarks)]
-            else:
-                faces = [(identifier, face, status)]
+            faces = [face]
             currentT = T
             break
 
     while True:
         t = yield t, []
-
-
 
 def track(video, shot, output,
           detect_min_size=0.0,
@@ -236,22 +214,18 @@ def extract(video, landmark_model, embedding_model, tracking, output):
         T, faces = faceGenerator.send(timestamp)
         # not that T might be differ slightly from t
         # due to different steps in frame iteration
-        for identifier, bounding_box, status in faces:
-
-            landmarks = face.get_landmarks(rgb, bounding_box)
+        for features in faces:
+            identifier, bbox, status=features['track'],features['bbox'],features['status']
+            landmarks = face.get_landmarks(rgb, bbox_to_rectangle(bbox,frame_width, frame_height,double=False))
             embedding = face.get_embedding(rgb, landmarks)
             save_landmarks=parts_to_landmarks(landmarks,frame_width,frame_height)
-            save_embedding=[]
-            for x in embedding:
-                save_embedding.append(x)
-            (left, top, right, bottom)=rectangle_to_bbox(bounding_box,frame_width, frame_height)
             save_extracted.append((
                 T,
                 identifier,
-                (left, top, right, bottom),
+                bbox,
                 status,
                 save_landmarks,
-                save_embedding
+                embedding
             ))
     extracted=np.array(
         save_extracted,
@@ -281,12 +255,9 @@ def get_make_frame(video, precomputed,yield_landmarks=False, labels=None,
     video.frame_size = (width, height)
 
 
-    generator=getGenerator(precomputed, width, height,
-        yield_landmarks=yield_landmarks, double=True)
+    generator=getGenerator(precomputed)
     generator.send(None)
 
-    if labels is None:
-        labels = dict()
 
     def make_frame(t):
 
@@ -295,16 +266,16 @@ def get_make_frame(video, precomputed,yield_landmarks=False, labels=None,
 
         cv2.putText(frame, '{t:.3f}'.format(t=t), (10, height-10),
                     cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1, 8, False)
-        for i, element in enumerate(faces):
+        for i, face in enumerate(faces):
+            identifier, bbox, status=face['track'],face['bbox'],face['status']
+            bbox=bbox_to_rectangle(bbox,width, height,double=False)
             if yield_landmarks:
-                identifier, face, status,landmarks=element
-            else:
-                identifier, face, status=element
+                landmarks = scale_up_landmarks(face['landmarks'],width, height)
             color = COLORS[identifier % len(COLORS)]
 
             # Draw face bounding box
-            pt1 = (int(face.left()), int(face.top()))
-            pt2 = (int(face.right()), int(face.bottom()))
+            pt1 = (int(bbox.left()), int(bbox.top()))
+            pt2 = (int(bbox.right()), int(bbox.bottom()))
             cv2.rectangle(frame, pt1, pt2, color, 2)
 
             # Print tracker identifier
@@ -313,7 +284,10 @@ def get_make_frame(video, precomputed,yield_landmarks=False, labels=None,
                         0.5, (255, 0, 0), 1, 8, False)
 
             # Print track label
-            label = labels.get(identifier, '')
+            if 'labels' not in face.dtype.names:
+                label=''
+            else:
+                label=face['labels']
             cv2.putText(frame,
                         '{label:s}'.format(label=label),
                         (pt1[0], pt1[1] - 7), cv2.FONT_HERSHEY_SIMPLEX,
