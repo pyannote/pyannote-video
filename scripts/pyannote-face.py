@@ -83,7 +83,6 @@ Visualization options (demo):
   --until=<sec>             Encode demo until <sec> seconds.
   --shift=<sec>             Shift result files by <sec> seconds [default: 0].
   --yield_landmarks         Show landmarks in output video.
-  --label=<path>            Path to track identification result file.
 
 """
 
@@ -236,7 +235,7 @@ def extract(video, landmark_model, embedding_model, tracking, output):
     )
     np.save(output,extracted)
 
-def get_make_frame(video, precomputed,yield_landmarks=False, labels=None,
+def get_make_frame(video, precomputed,yield_landmarks=False,
                    height=200, shift=0.0):
 
     COLORS = [
@@ -305,23 +304,14 @@ def get_make_frame(video, precomputed,yield_landmarks=False, labels=None,
 
 
 def demo(filename, precomputed, output, t_start=0., t_end=None, shift=0.,
-         labels=None, yield_landmarks=False, height=200, ffmpeg=None):
-
-    # parse label file
-    if labels is not None:
-        with open(labels, 'r') as f:
-            labels = {}
-            for line in f:
-                identifier, label = line.strip().split()
-                identifier = int(identifier)
-                labels[identifier] = label
+         yield_landmarks=False, height=200, ffmpeg=None):
 
     video = Video(filename, ffmpeg=ffmpeg)
 
     from moviepy.editor import VideoClip, AudioFileClip
 
     make_frame = get_make_frame(video, precomputed, yield_landmarks=yield_landmarks,
-                                labels=labels, height=height, shift=shift)
+                                height=height, shift=shift)
     video_clip = VideoClip(make_frame, duration=video.duration)
     audio_clip = AudioFileClip(filename)
     clip = video_clip.set_audio(audio_clip)
@@ -383,10 +373,6 @@ if __name__ == '__main__':
 
         shift = float(arguments['--shift'])
 
-        labels = arguments['--label']
-        if not labels:
-            labels = None
-
         yield_landmarks = arguments['--yield_landmarks']
 
         height = int(arguments['--height'])
@@ -394,4 +380,4 @@ if __name__ == '__main__':
         demo(filename, precomputed, output,
              t_start=t_start, t_end=t_end,
              yield_landmarks=yield_landmarks, height=height,
-             shift=shift, labels=labels, ffmpeg=ffmpeg)
+             shift=shift, ffmpeg=ffmpeg)
