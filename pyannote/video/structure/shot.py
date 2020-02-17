@@ -142,4 +142,6 @@ class Shot(object):
             previous = t[i]
             _i = i
 
-        yield Segment(previous, self.video.end)
+        last_segment = Segment(previous, self.video.end)
+        if last_segment:
+            yield last_segment
