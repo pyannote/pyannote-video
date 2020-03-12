@@ -44,3 +44,30 @@ $ jupyter notebook --notebook-dir="pyannote-video/doc"
 ## Documentation
 
 No proper documentation for the time being...
+
+### Computed data format
+
+We use [NumPy structured arrays](https://docs.scipy.org/doc/numpy/user/basics.rec.html) to store :
+- bounding boxes formated as (left, top, right, bottom)
+- identifier for the track
+- time in seconds where that face was tracked
+- status of the tracking algorithm, e.g. 'backward'
+- landmarks
+- embeddings
+
+File which should be named as `<file_uri>.npy`.
+
+The array has shape `(N,)`, with `N` being sum of the number of frames over every track.
+Each track has dtype :
+```py
+[
+  ('time', 'float64'),
+  ('track', 'int64'),
+  ('bbox', 'float64', (4,)),
+  ('status', '<U21'),
+  ('landmarks', 'float64', (68,)),
+  ('embeddings', 'float64', (128,))
+]
+```
+
+When using single rgb image (implemented in pyannote.db.plumcot), there's no tracking so each line of the array represents a different face (thus there's no 'time' nor 'track' nor 'status' field).

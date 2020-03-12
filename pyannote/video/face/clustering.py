@@ -34,7 +34,6 @@ import itertools
 import numpy as np
 from sortedcollections import ValueSortedDict
 
-from pandas import read_table
 from pyannote.core import Segment, Annotation
 
 from pyannote.algorithms.clustering.hac import \
@@ -45,6 +44,8 @@ from pyannote.algorithms.clustering.hac.stop import DistanceThreshold
 
 from scipy.spatial.distance import euclidean, pdist, cdist, squareform
 
+def data_to_segment(data):
+    return Segment(np.min(data['time']), np.max(data['time']))
 
 class _Model(HACModel):
     """Average Euclidean distance between face embeddings"""
@@ -56,6 +57,7 @@ class _Model(HACModel):
     def _to_segment(group):
         return Segment(np.min(group.time), np.max(group.time))
 
+
     def preprocess(self, embedding):
         """
         Parameters
@@ -66,15 +68,12 @@ class _Model(HACModel):
 
         # TODO : option to only keep 'detections'
         # (make sure it does not alter 'starting_point' segments)
-
-        names = ['time', 'track']
-        for i in range(128):
-            names += ['d{0}'.format(i)]
-        data = read_table(embedding, delim_whitespace=True,
-                          header=None, names=names)
-        data.sort_values(by=['track', 'time'], inplace=True)
+        data = np.load(embedding)
+        data.sort(order=['track', 'time'])
         starting_point = Annotation(modality='face')
-        for track, segment in data.groupby('track').apply(self._to_segment).iteritems():
+        for track in np.unique(data['track']):
+            track_i=np.where(data["track"]==track)[0]
+            segment=data_to_segment(data[track_i])
             if not segment:
                 continue
             starting_point[segment, track] = track
@@ -97,7 +96,7 @@ class _Model(HACModel):
 
         # precompute pairwise embedding distance
         data = parent.features
-        X = np.array(data[data.columns[2:]])
+        X = np.array(data["embeddings"])
         self.precomputed_ = -squareform(pdist(X, metric='euclidean'))
 
         matrix = ValueSortedDict()

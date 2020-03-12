@@ -34,8 +34,8 @@ The standard pipeline is the following
 
 Usage:
   pyannote-face track [options] <video> <shot.json> <tracking>
-  pyannote-face extract [options] <video> <tracking> <landmark_model> <embedding_model> <landmarks> <embeddings>
-  pyannote-face demo [options] <video> <tracking> <output>
+  pyannote-face extract [options] <video> <tracking> <landmark_model> <embedding_model> <output>
+  pyannote-face demo [options] <video> <precomputed> <output>
   pyannote-face (-h | --help)
   pyannote-face --version
 
@@ -70,21 +70,19 @@ Feature extraction options (features):
   <tracking>                Path to tracking result file.
   <landmark_model>          Path to dlib facial landmark detection model.
   <embedding_model>         Path to dlib feature extraction model.
-  <landmarks>               Path to facial landmarks detection result file.
-  <embeddings>              Path to feature extraction result file.
+  <output>                  Path to features result file.
 
 Visualization options (demo):
 
   <video>                   Path to video file.
-  <tracking>                Path to tracking result file.
+  <precomputed>             Path to the precomputed features file.
   <output>                  Path to demo video file.
 
   --height=<pixels>         Height of demo video file [default: 400].
   --from=<sec>              Encode demo from <sec> seconds [default: 0].
   --until=<sec>             Encode demo until <sec> seconds.
   --shift=<sec>             Shift result files by <sec> seconds [default: 0].
-  --landmark=<path>         Path to facial landmarks detection result file.
-  --label=<path>            Path to track identification result file.
+  --yield_landmarks         Show landmarks in output video.
 
 """
 
@@ -99,56 +97,48 @@ from pyannote.video import __version__
 from pyannote.video import Video
 from pyannote.video import Face
 from pyannote.video import FaceTracking
+from pyannote.video.utils.scale_frame import bbox_to_rectangle, rectangle_to_bbox, parts_to_landmarks,scale_up_landmarks
 
-from pandas import read_table
-
-from six.moves import zip
 import numpy as np
 import cv2
 
 import dlib
 
-
+LANDMARKS_DIM=(68,2)
+EMBEDDING_DIM=128
 MIN_OVERLAP_RATIO = 0.5
 MIN_CONFIDENCE = 10.
 MAX_GAP = 1.
 
-FACE_TEMPLATE = ('{t:.3f} {identifier:d} '
-                 '{left:.3f} {top:.3f} {right:.3f} {bottom:.3f} '
-                 '{status:s}\n')
+LANDMARKS_DTYPE=('landmarks', 'float64', LANDMARKS_DIM)
+EMBEDDING_DTYPE=('embeddings', 'float64', (EMBEDDING_DIM,))
+BBOX_DTYPE=('bbox', 'float64', (4,))
+TRACK_DTYPE=[
+    ('time', 'float64'),
+    ('track', 'int64'),
+    BBOX_DTYPE,
+    ('status', '<U21'),
+]
 
+def getGenerator(precomputed):
+    """Parse precomputed face file and generate timestamped faces
+    """
 
-def getFaceGenerator(tracking, frame_width, frame_height, double=True):
-    """Parse precomputed face file and generate timestamped faces"""
-
-    # load tracking file and sort it by timestamp
-    names = ['t', 'track', 'left', 'top', 'right', 'bottom', 'status']
-    dtype = {'left': np.float32, 'top': np.float32,
-             'right': np.float32, 'bottom': np.float32}
-    tracking = read_table(tracking, delim_whitespace=True, header=None,
-                          names=names, dtype=dtype)
-    tracking = tracking.sort_values('t')
+    # load precomputed file and sort it by timestamp
+    precomputed = np.load(precomputed)
+    precomputed.sort(order='time')
 
     # t is the time sent by the frame generator
     t = yield
 
-    rectangle = dlib.drectangle if double else dlib.rectangle
-
     faces = []
     currentT = None
 
-    for _, (T, identifier, left, top, right, bottom, status) in tracking.iterrows():
-
-        left = int(left * frame_width)
-        right = int(right * frame_width)
-        top = int(top * frame_height)
-        bottom = int(bottom * frame_height)
-
-        face = rectangle(left, top, right, bottom)
-
+    for face in precomputed:
+        T=face['time']
         # load all faces from current frame and only those faces
         if T == currentT or currentT is None:
-            faces.append((identifier, face, status))
+            faces.append(face)
             currentT = T
             continue
 
@@ -167,74 +157,12 @@ def getFaceGenerator(tracking, frame_width, frame_height, double=True):
             t = yield currentT, faces
 
             # reset current time and corresponding faces
-            faces = [(identifier, face, status)]
+            faces = [face]
             currentT = T
             break
 
     while True:
         t = yield t, []
-
-
-def pairwise(iterable):
-    "s -> (s0,s1), (s2,s3), (s4, s5), ..."
-    a = iter(iterable)
-    return zip(a, a)
-
-
-def getLandmarkGenerator(shape, frame_width, frame_height):
-    """Parse precomputed shape file and generate timestamped shapes"""
-
-    # load landmarks file
-    shape = read_table(shape, delim_whitespace=True, header=None)
-
-    # deduce number of landmarks from file dimension
-    _, d = shape.shape
-    n_points = (d - 2) / 2
-
-    # t is the time sent by the frame generator
-    t = yield
-
-    shapes = []
-    currentT = None
-
-    for _, row in shape.iterrows():
-
-        T = float(row[0])
-        identifier = int(row[1])
-        landmarks = np.float32(list(pairwise(
-            [coordinate for coordinate in row[2:]])))
-        landmarks[:, 0] = np.round(landmarks[:, 0] * frame_width)
-        landmarks[:, 1] = np.round(landmarks[:, 1] * frame_height)
-
-        # load all shapes from current frame
-        # and only those shapes
-        if T == currentT or currentT is None:
-            shapes.append((identifier, landmarks))
-            currentT = T
-            continue
-
-        # once all shapes at current time are loaded
-        # wait until t reaches current time
-        # then returns all shapes at once
-
-        while True:
-
-            # wait...
-            if currentT > t:
-                t = yield t, []
-                continue
-
-            # return all shapes at once
-            t = yield currentT, shapes
-
-            # reset current time and corresponding shapes
-            shapes = [(identifier, landmarks)]
-            currentT = T
-            break
-
-    while True:
-        t = yield t, []
-
 
 def track(video, shot, output,
           detect_min_size=0.0,
@@ -243,7 +171,6 @@ def track(video, shot, output,
           track_min_confidence=MIN_CONFIDENCE,
           track_max_gap=MAX_GAP):
     """Tracking by detection"""
-
     tracking = FaceTracking(detect_min_size=detect_min_size,
                             detect_every=detect_every,
                             track_min_overlap_ratio=track_min_overlap_ratio,
@@ -255,66 +182,60 @@ def track(video, shot, output,
 
     if isinstance(shot, Annotation):
         shot = shot.get_timeline()
+    save_tracks=[]
+    for identifier, track in enumerate(tracking(video, shot)):
+        for i, (t, (left, top, right, bottom), status) in enumerate(track):
+            save_tracks.append((
+                t,
+                identifier,
+                (left, top, right, bottom),
+                status
+            ))
+    tracks=np.array(
+        save_tracks,
+        dtype=TRACK_DTYPE
+    )
+    np.save(output,tracks)
 
-    with open(output, 'w') as foutput:
-
-        for identifier, track in enumerate(tracking(video, shot)):
-
-            for t, (left, top, right, bottom), status in track:
-
-                foutput.write(FACE_TEMPLATE.format(
-                    t=t, identifier=identifier, status=status,
-                    left=left, right=right, top=top, bottom=bottom))
-
-            foutput.flush()
-
-def extract(video, landmark_model, embedding_model, tracking, landmark_output, embedding_output):
-    """Facial features detection"""
+def extract(video, landmark_model, embedding_model, tracking, output):
+    """Facial features detection for video"""
 
     # face generator
     frame_width, frame_height = video.frame_size
-    faceGenerator = getFaceGenerator(tracking,
-                                     frame_width, frame_height,
-                                     double=False)
+    faceGenerator = getGenerator(tracking)
     faceGenerator.send(None)
-
     face = Face(landmarks=landmark_model,
                 embedding=embedding_model)
 
-    with open(landmark_output, 'w') as flandmark, \
-         open(embedding_output, 'w') as fembedding:
+    save_extracted=[]
+    for timestamp, rgb in video:
+        # get all detected faces at this time
+        T, faces = faceGenerator.send(timestamp)
+        # not that T might be differ slightly from t
+        # due to different steps in frame iteration
+        for features in faces:
+            identifier, bbox, status=features['track'],features['bbox'],features['status']
+            landmarks = face.get_landmarks(rgb, bbox_to_rectangle(bbox,frame_width, frame_height,double=False))
+            embedding = face.get_embedding(rgb, landmarks)
+            save_landmarks=parts_to_landmarks(landmarks,frame_width,frame_height)
+            save_extracted.append((
+                T,
+                identifier,
+                bbox,
+                status,
+                save_landmarks,
+                embedding
+            ))
+    extracted=np.array(
+        save_extracted,
+        dtype=TRACK_DTYPE+[
+          LANDMARKS_DTYPE,
+          EMBEDDING_DTYPE
+        ]
+    )
+    np.save(output,extracted)
 
-        for timestamp, rgb in video:
-
-            # get all detected faces at this time
-            T, faces = faceGenerator.send(timestamp)
-            # not that T might be differ slightly from t
-            # due to different steps in frame iteration
-
-            for identifier, bounding_box, _ in faces:
-
-                landmarks = face.get_landmarks(rgb, bounding_box)
-                embedding = face.get_embedding(rgb, landmarks)
-
-                flandmark.write('{t:.3f} {identifier:d}'.format(
-                    t=T, identifier=identifier))
-                for p in landmarks.parts():
-                    x, y = p.x, p.y
-                    flandmark.write(' {x:.5f} {y:.5f}'.format(x=x / frame_width,
-                                                            y=y / frame_height))
-                flandmark.write('\n')
-
-                fembedding.write('{t:.3f} {identifier:d}'.format(
-                    t=T, identifier=identifier))
-                for x in embedding:
-                    fembedding.write(' {x:.5f}'.format(x=x))
-                fembedding.write('\n')
-
-            flandmark.flush()
-            fembedding.flush()
-
-
-def get_make_frame(video, tracking, landmark=None, labels=None,
+def get_make_frame(video, precomputed,yield_landmarks=False,
                    height=200, shift=0.0):
 
     COLORS = [
@@ -332,32 +253,28 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
     width = int(ratio * video_width)
     video.frame_size = (width, height)
 
-    faceGenerator = getFaceGenerator(tracking, width, height, double=True)
-    faceGenerator.send(None)
 
-    if landmark:
-        landmarkGenerator = getLandmarkGenerator(landmark, width, height)
-        landmarkGenerator.send(None)
+    generator=getGenerator(precomputed)
+    generator.send(None)
 
-    if labels is None:
-        labels = dict()
 
     def make_frame(t):
 
         frame = video(t)
-        _, faces = faceGenerator.send(t - shift)
-
-        if landmark:
-            _, landmarks = landmarkGenerator.send(t - shift)
+        _,faces = generator.send(t - shift)
 
         cv2.putText(frame, '{t:.3f}'.format(t=t), (10, height-10),
                     cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1, 8, False)
-        for i, (identifier, face, _) in enumerate(faces):
+        for i, face in enumerate(faces):
+            identifier, bbox, status=face['track'],face['bbox'],face['status']
+            bbox=bbox_to_rectangle(bbox,width, height,double=False)
+            if yield_landmarks:
+                landmarks = scale_up_landmarks(face['landmarks'],width, height)
             color = COLORS[identifier % len(COLORS)]
 
             # Draw face bounding box
-            pt1 = (int(face.left()), int(face.top()))
-            pt2 = (int(face.right()), int(face.bottom()))
+            pt1 = (int(bbox.left()), int(bbox.top()))
+            pt2 = (int(bbox.right()), int(bbox.bottom()))
             cv2.rectangle(frame, pt1, pt2, color, 2)
 
             # Print tracker identifier
@@ -366,17 +283,19 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
                         0.5, (255, 0, 0), 1, 8, False)
 
             # Print track label
-            label = labels.get(identifier, '')
+            if 'labels' not in face.dtype.names:
+                label=''
+            else:
+                label=face['labels']
             cv2.putText(frame,
                         '{label:s}'.format(label=label),
                         (pt1[0], pt1[1] - 7), cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, (255, 0, 0), 1, 8, False)
 
             # Draw nose
-            if landmark:
-                points = landmarks[i][0].parts()
-                pt1 = (int(points[27, 0]), int(points[27, 1]))
-                pt2 = (int(points[33, 0]), int(points[33, 1]))
+            if yield_landmarks:
+                pt1 = (int(landmarks[27][0]), int(landmarks[27][1]))
+                pt2 = (int(landmarks[33][0]), int(landmarks[33][1]))
                 cv2.line(frame, pt1, pt2, color, 1)
 
         return frame
@@ -384,24 +303,15 @@ def get_make_frame(video, tracking, landmark=None, labels=None,
     return make_frame
 
 
-def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
-         labels=None, landmark=None, height=200, ffmpeg=None):
-
-    # parse label file
-    if labels is not None:
-        with open(labels, 'r') as f:
-            labels = {}
-            for line in f:
-                identifier, label = line.strip().split()
-                identifier = int(identifier)
-                labels[identifier] = label
+def demo(filename, precomputed, output, t_start=0., t_end=None, shift=0.,
+         yield_landmarks=False, height=200, ffmpeg=None):
 
     video = Video(filename, ffmpeg=ffmpeg)
 
     from moviepy.editor import VideoClip, AudioFileClip
 
-    make_frame = get_make_frame(video, tracking, landmark=landmark,
-                                labels=labels, height=height, shift=shift)
+    make_frame = get_make_frame(video, precomputed, yield_landmarks=yield_landmarks,
+                                height=height, shift=shift)
     video_clip = VideoClip(make_frame, duration=video.duration)
     audio_clip = AudioFileClip(filename)
     clip = video_clip.set_audio(audio_clip)
@@ -448,15 +358,13 @@ if __name__ == '__main__':
         tracking = arguments['<tracking>']
         landmark_model = arguments['<landmark_model>']
         embedding_model = arguments['<embedding_model>']
-        landmarks = arguments['<landmarks>']
-        embeddings = arguments['<embeddings>']
-        extract(video, landmark_model, embedding_model, tracking,
-                landmarks, embeddings)
+        output = arguments['<output>']
+        extract(video, landmark_model, embedding_model, tracking, output)
 
 
     if arguments['demo']:
 
-        tracking = arguments['<tracking>']
+        precomputed = arguments['<precomputed>']
         output = arguments['<output>']
 
         t_start = float(arguments['--from'])
@@ -465,17 +373,11 @@ if __name__ == '__main__':
 
         shift = float(arguments['--shift'])
 
-        labels = arguments['--label']
-        if not labels:
-            labels = None
-
-        landmark = arguments['--landmark']
-        if not landmark:
-            landmark = None
+        yield_landmarks = arguments['--yield_landmarks']
 
         height = int(arguments['--height'])
 
-        demo(filename, tracking, output,
+        demo(filename, precomputed, output,
              t_start=t_start, t_end=t_end,
-             landmark=landmark, height=height,
-             shift=shift, labels=labels, ffmpeg=ffmpeg)
+             yield_landmarks=yield_landmarks, height=height,
+             shift=shift, ffmpeg=ffmpeg)
