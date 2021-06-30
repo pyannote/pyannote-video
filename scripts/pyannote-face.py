@@ -402,9 +402,10 @@ def demo(filename, tracking, output, t_start=0., t_end=None, shift=0.,
 
     make_frame = get_make_frame(video, tracking, landmark=landmark,
                                 labels=labels, height=height, shift=shift)
-    video_clip = VideoClip(make_frame, duration=video.duration)
-    audio_clip = AudioFileClip(filename)
-    clip = video_clip.set_audio(audio_clip)
+    clip = VideoClip(make_frame, duration=video.duration)
+    if video.has_audio:
+        audio_clip = AudioFileClip(filename)
+        clip = clip.set_audio(audio_clip)
 
     if t_end is None:
         t_end = video.duration
