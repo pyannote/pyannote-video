@@ -134,6 +134,7 @@ class Video(object):
         self._duration = infos['video_duration']
         # self.ffmpeg_duration = infos['duration']
         self._nframes = infos['video_nframes']
+        self.has_audio = infos['audio_found']
 
         self.start = 0. if start is None else start
         self.end = self._duration if end is None else end
