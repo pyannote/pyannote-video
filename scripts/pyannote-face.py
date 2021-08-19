@@ -33,7 +33,7 @@ The standard pipeline is the following
       face tracking => feature extraction => face clustering
 
 Usage:
-  pyannote-face track [options] <video> <shot.json> <tracking>
+  pyannote-face track [options] <video> <landmark_model> <shot.json> <tracking>
   pyannote-face extract [options] <video> <tracking> <landmark_model> <embedding_model> <landmarks> <embeddings>
   pyannote-face demo [options] <video> <tracking> <output>
   pyannote-face (-h | --help)
@@ -107,7 +107,9 @@ import numpy as np
 import cv2
 
 import dlib
+import os
 
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 MIN_OVERLAP_RATIO = 0.5
 MIN_CONFIDENCE = 10.
@@ -236,7 +238,7 @@ def getLandmarkGenerator(shape, frame_width, frame_height):
         t = yield t, []
 
 
-def track(video, shot, output,
+def track(video, landmark_model, shot, output,
           detect_min_size=0.0,
           detect_every=0.0,
           track_min_overlap_ratio=MIN_OVERLAP_RATIO,
@@ -244,7 +246,7 @@ def track(video, shot, output,
           track_max_gap=MAX_GAP):
     """Tracking by detection"""
 
-    tracking = FaceTracking(detect_min_size=detect_min_size,
+    tracking = FaceTracking(landmark_model, detect_min_size=detect_min_size,
                             detect_every=detect_every,
                             track_min_overlap_ratio=track_min_overlap_ratio,
                             track_min_confidence=track_min_confidence,
@@ -267,6 +269,14 @@ def track(video, shot, output,
                     left=left, right=right, top=top, bottom=bottom))
 
             foutput.flush()
+
+def intersection(r1, r2):
+    x = max(r1[0], r2[0])
+    y = max(r1[1], r2[1])
+    w = min(r1[0]+r1[2], r2[0]+r2[2]) - x
+    h = min(r1[1]+r1[3], r2[1]+r2[3]) - y
+    if w<0 or h<0: return None
+    return (x,y,w,h)
 
 def extract(video, landmark_model, embedding_model, tracking, landmark_output, embedding_output):
     """Facial features detection"""
@@ -293,13 +303,49 @@ def extract(video, landmark_model, embedding_model, tracking, landmark_output, e
 
             for identifier, bounding_box, _ in faces:
 
-                landmarks = face.get_landmarks(rgb, bounding_box)
-                embedding = face.get_embedding(rgb, landmarks)
+                #print(bounding_box)
+                crop_ = rgb.copy()
+                crop_ = crop_[bounding_box.top():bounding_box.bottom(),
+                            bounding_box.left():bounding_box.right()]
+                #copy = cv2.resize()
+                #cv2.imwrite('bla.png',rgb)
+                #cv2.imwrite('bla_crop.png',crop_)
+
+                res = face.iter_data(rgb, return_landmarks=True, return_embedding=True)
+                res = list(res)
+                if len(res) == 0:
+                    continue
+                for r in res:
+                    face_, landmarks, embedding = r[0], r[1], r[2]
+                    #print(face_, bounding_box)
+                    #print(bounding_box.left(), bounding_box.top(), bounding_box.right(), bounding_box.bottom())
+                    if intersection(face_, [bounding_box.left(), bounding_box.top(), bounding_box.right(), bounding_box.bottom()]):
+                        #if int(face_[0]) == bounding_box.left() and int(face_[1]) == bounding_box.top() and int(face_[2]) == bounding_box.right() and int(face_[3]) == bounding_box.bottom():
+                        #print('YES')
+                        #landmarks = list(landmarks)[0] #Just one normally because with crop the image to only one face
+                        #embedding = list(embedding)[0]
+                        crop_ = rgb.copy()
+                        crop_ = crop_[int(face_[1]):int(face_[3]),
+                                    int(face_[0]):int(face_[2])]
+                        #cv2.imwrite('bla_new_crop.png',crop_)
+                        #return
+                '''face_ = list(face_)
+                landmarks = list(landmarks)
+                embedding = list(embedding)
+                for ile in range(len(face_)):
+                    print(face_[ile], bounding_box)
+                    if intersection(face_[ile], bounding_box):
+                        landmarks = landmarks[ile]
+                        embedding = embedding[ile]
+                        crop_ = rgb.copy()
+                        crop_ = crop_[face_.top():face_.bottom(),
+                                    face_.left():face_.right()]
+                        cv2.imwrite('bla_new_crop.png',crop_)'''
 
                 flandmark.write('{t:.3f} {identifier:d}'.format(
                     t=T, identifier=identifier))
-                for p in landmarks.parts():
-                    x, y = p.x, p.y
+                for p in landmarks:
+                    x, y = p[0], p[1]
                     flandmark.write(' {x:.5f} {y:.5f}'.format(x=x / frame_width,
                                                             y=y / frame_height))
                 flandmark.write('\n')
@@ -429,6 +475,7 @@ if __name__ == '__main__':
     # face tracking
     if arguments['track']:
 
+        landmark_model = arguments['<landmark_model>']
         shot = arguments['<shot.json>']
         tracking = arguments['<tracking>']
         detect_min_size = float(arguments['--min-size'])
@@ -436,7 +483,7 @@ if __name__ == '__main__':
         track_min_overlap_ratio = float(arguments['--min-overlap'])
         track_min_confidence = float(arguments['--min-confidence'])
         track_max_gap = float(arguments['--max-gap'])
-        track(video, shot, tracking,
+        track(video, landmark_model, shot, tracking,
               detect_min_size=detect_min_size,
               detect_every=detect_every,
               track_min_overlap_ratio=track_min_overlap_ratio,

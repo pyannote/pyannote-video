@@ -38,7 +38,7 @@ def get_face_detect(face):
     def face_detect(frame):
         """Detect face in frame"""
         for f in face.iterfaces(frame):
-            yield (f.left(), f.top(), f.right(), f.bottom())
+            yield (f[0], f[1], f[2], f[3]) #f[4] is the confidence score of the face detection MTCNN
     return face_detect
 
 
@@ -47,6 +47,8 @@ class FaceTracking(TrackingByDetection):
 
     Parameters
     ----------
+    landmarks : str
+        Path of the MTCNN detector model
     detect_min_size : float, optional
         Approximate size (in video height ratio) of the smallest face that
         should be detected. Defaults to any face.
@@ -61,11 +63,11 @@ class FaceTracking(TrackingByDetection):
     track_max_gap : float, optional
         Bridge gaps with duration shorter than this value.
     """
-    def __init__(self, detect_min_size=0., detect_every=0.,
+    def __init__(self, landmarks, detect_min_size=0., detect_every=0.,
                  track_min_confidence=10.,track_min_overlap_ratio=0.3,
                  track_max_gap=0.):
 
-        face = Face()
+        face = Face(landmarks)
         detect_func = get_face_detect(face)
 
         super(FaceTracking, self).__init__(
