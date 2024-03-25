@@ -46,7 +46,7 @@ setup(
         'numpy >= 1.8',
         'docopt >= 0.6.2',
         'tqdm >= 4.23.2',
-        'dlib == 19.12',
+        'dlib',
         'opencv-python >= 3.4.1.15',
         'munkres >= 1.0.7',
         'moviepy == 0.2.3.4',
